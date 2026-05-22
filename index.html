@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PrescriçõesMed</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- WELCOME SCREEN -->
+  <div id="screen-welcome" class="screen active">
+    <div class="bg-grid"></div>
+    <div class="welcome-content">
+      <div class="logo-badge">RX</div>
+      <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
+      <p class="welcome-sub">Selecione o setor de atendimento para iniciar</p>
+
+      <div class="sector-grid">
+        <button class="sector-card" data-sector="UTI" onclick="selectSector(this)">
+          <div class="sector-icon">🫀</div>
+          <div class="sector-name">UTI</div>
+          <div class="sector-desc">Unidade de Terapia Intensiva</div>
+        </button>
+        <button class="sector-card" data-sector="Sala Vermelha" onclick="selectSector(this)">
+          <div class="sector-icon">🚨</div>
+          <div class="sector-name">Sala Vermelha</div>
+          <div class="sector-desc">Emergências críticas</div>
+        </button>
+        <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
+          <div class="sector-icon">🩺</div>
+          <div class="sector-name">Sala Verde</div>
+          <div class="sector-desc">Média complexidade</div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DISEASE SELECTION SCREEN -->
+  <div id="screen-disease" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" id="active-sector-label"></div>
+      <button class="btn-admin" onclick="openAdmin()">⚙ Gerenciar</button>
+    </div>
+
+    <div class="disease-content">
+      <h2 class="section-title">Selecione a <em>doença</em></h2>
+      <div class="search-wrap">
+        <input type="text" id="search-input" placeholder="Buscar diagnóstico..." oninput="filterDiseases()" />
+      </div>
+      <div class="disease-list" id="disease-list"></div>
+    </div>
+  </div>
+
+  <!-- PRESCRIPTION SCREEN -->
+  <div id="screen-prescription" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-disease')">← Voltar</button>
+      <div class="sector-badge" id="rx-sector-label"></div>
+    </div>
+
+    <div class="rx-content">
+      <div class="rx-header">
+        <span class="rx-tag">PRESCRIÇÃO</span>
+        <h2 class="rx-title" id="rx-disease-name"></h2>
+      </div>
+
+      <div class="rx-card" id="rx-card">
+        <div class="rx-card-header">
+          <span class="rx-symbol">℞</span>
+          <span class="rx-date" id="rx-date"></span>
+        </div>
+        <pre class="rx-text" id="rx-text"></pre>
+      </div>
+
+      <div class="rx-actions">
+        <button class="btn-copy" id="btn-copy" onclick="copyPrescription()">
+          <span class="copy-icon">⎘</span> Copiar Prescrição
+        </button>
+        <div class="copy-feedback" id="copy-feedback">✓ Copiado!</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ADMIN MODAL -->
+  <div id="admin-modal" class="modal-overlay" onclick="closeAdminIfOutside(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Gerenciar Prescrições</h3>
+        <button class="modal-close" onclick="closeAdmin()">✕</button>
+      </div>
+
+      <div class="modal-tabs">
+        <button class="tab active" onclick="switchTab('tab-list', this)">Ver Prescrições</button>
+        <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
+        <button class="tab" onclick="switchTab('tab-edit', this)" id="tab-edit-btn" style="display:none">✎ Editar</button>
+      </div>
+
+      <div id="tab-list" class="tab-content active">
+        <div class="admin-filter">
+          <select id="admin-sector-filter" onchange="renderAdminList()">
+            <option value="">Todos os setores</option>
+            <option value="UTI">UTI</option>
+            <option value="Sala Vermelha">Sala Vermelha</option>
+            <option value="Sala Verde">Sala Verde</option>
+          </select>
+        </div>
+        <div class="admin-list" id="admin-list"></div>
+      </div>
+
+      <div id="tab-add" class="tab-content">
+        <form class="admin-form" onsubmit="saveNewPrescription(event)">
+          <label>Setor</label>
+          <select name="sector" required>
+            <option value="">Selecionar...</option>
+            <option value="UTI">UTI</option>
+            <option value="Sala Vermelha">Sala Vermelha</option>
+            <option value="Sala Verde">Sala Verde</option>
+          </select>
+
+          <label>Nome da Doença / Diagnóstico</label>
+          <input type="text" name="disease" placeholder="ex: Sepse" required />
+
+          <label>Prescrição Médica</label>
+          <textarea name="prescription" rows="10" placeholder="Digite a prescrição completa aqui..." required></textarea>
+
+          <button type="submit" class="btn-save">Salvar Prescrição</button>
+        </form>
+      </div>
+
+      <div id="tab-edit" class="tab-content">
+        <form class="admin-form" onsubmit="updatePrescription(event)">
+          <input type="hidden" name="edit-id" id="edit-id" />
+          <label>Setor</label>
+          <select name="edit-sector" id="edit-sector" required>
+            <option value="UTI">UTI</option>
+            <option value="Sala Vermelha">Sala Vermelha</option>
+            <option value="Sala Verde">Sala Verde</option>
+          </select>
+
+          <label>Nome da Doença / Diagnóstico</label>
+          <input type="text" name="edit-disease" id="edit-disease" required />
+
+          <label>Prescrição Médica</label>
+          <textarea name="edit-prescription" id="edit-prescription" rows="10" required></textarea>
+
+          <div style="display:flex;gap:12px">
+            <button type="submit" class="btn-save">Atualizar</button>
+            <button type="button" class="btn-delete" onclick="deletePrescription()">Excluir</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
