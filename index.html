@@ -17,7 +17,6 @@
       <div class="logo-badge">RX</div>
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento para iniciar</p>
-
       <div class="sector-grid">
         <button class="sector-card" data-sector="UTI" onclick="selectSector(this)">
           <div class="sector-icon">🫀</div>
@@ -46,7 +45,6 @@
       <div class="sector-badge" id="active-sector-label"></div>
       <button class="btn-admin" onclick="openAdmin()">⚙ Gerenciar</button>
     </div>
-
     <div class="disease-content">
       <h2 class="section-title">Selecione a <em>doença</em></h2>
       <div class="search-wrap">
@@ -63,13 +61,11 @@
       <button class="btn-back" onclick="goBack('screen-disease')">← Voltar</button>
       <div class="sector-badge" id="rx-sector-label"></div>
     </div>
-
     <div class="rx-content">
       <div class="rx-header">
         <span class="rx-tag">PRESCRIÇÃO</span>
         <h2 class="rx-title" id="rx-disease-name"></h2>
       </div>
-
       <div class="rx-card" id="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -77,7 +73,6 @@
         </div>
         <pre class="rx-text" id="rx-text"></pre>
       </div>
-
       <div class="rx-actions">
         <button class="btn-copy" id="btn-copy" onclick="copyPrescription()">
           <span class="copy-icon">⎘</span> Copiar Prescrição
@@ -87,6 +82,12 @@
     </div>
   </div>
 
+  <!-- LOADING OVERLAY -->
+  <div id="loading" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <span>Carregando...</span>
+  </div>
+
   <!-- ADMIN MODAL -->
   <div id="admin-modal" class="modal-overlay" onclick="closeAdminIfOutside(event)">
     <div class="modal">
@@ -94,7 +95,6 @@
         <h3>Gerenciar Prescrições</h3>
         <button class="modal-close" onclick="closeAdmin()">✕</button>
       </div>
-
       <div class="modal-tabs">
         <button class="tab active" onclick="switchTab('tab-list', this)">Ver Prescrições</button>
         <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
@@ -122,33 +122,27 @@
             <option value="Sala Vermelha">Sala Vermelha</option>
             <option value="Sala Verde">Sala Verde</option>
           </select>
-
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" name="disease" placeholder="ex: Sepse" required />
-
           <label>Prescrição Médica</label>
           <textarea name="prescription" rows="10" placeholder="Digite a prescrição completa aqui..." required></textarea>
-
           <button type="submit" class="btn-save">Salvar Prescrição</button>
         </form>
       </div>
 
       <div id="tab-edit" class="tab-content">
         <form class="admin-form" onsubmit="updatePrescription(event)">
-          <input type="hidden" name="edit-id" id="edit-id" />
+          <input type="hidden" id="edit-id" />
           <label>Setor</label>
-          <select name="edit-sector" id="edit-sector" required>
+          <select id="edit-sector" required>
             <option value="UTI">UTI</option>
             <option value="Sala Vermelha">Sala Vermelha</option>
             <option value="Sala Verde">Sala Verde</option>
           </select>
-
           <label>Nome da Doença / Diagnóstico</label>
-          <input type="text" name="edit-disease" id="edit-disease" required />
-
+          <input type="text" id="edit-disease" required />
           <label>Prescrição Médica</label>
-          <textarea name="edit-prescription" id="edit-prescription" rows="10" required></textarea>
-
+          <textarea id="edit-prescription" rows="10" required></textarea>
           <div style="display:flex;gap:12px">
             <button type="submit" class="btn-save">Atualizar</button>
             <button type="button" class="btn-delete" onclick="deletePrescription()">Excluir</button>
@@ -158,7 +152,7 @@
     </div>
   </div>
 
-  <script src="db.js"></script>
-  <script src="app.js"></script>
+  <script type="module" src="db.js"></script>
+  <script src="app.js" defer></script>
 </body>
 </html>
