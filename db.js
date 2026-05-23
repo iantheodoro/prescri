@@ -1,11 +1,6 @@
 // ============================================================
-//  db.js — Banco de dados Firebase Firestore
-//  Sincronizado em todos os dispositivos
+//  db.js — Firebase Firestore via CDN (compat mode)
 // ============================================================
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, where }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB3rh1_H4hNFRauNV57_1-aWivG_HF7wUY",
@@ -16,11 +11,10 @@ const firebaseConfig = {
   appId: "1:968458765807:web:65faa5479c03b30532e21a"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+firebase.initializeApp(firebaseConfig);
+const db  = firebase.firestore();
 const COL = "prescricoes";
 
-// ── Prescrições iniciais ──────────────────────────────────
 const SEED_DATA = [
   {
     sector: "UTI", disease: "Sepse / Choque Séptico",
@@ -203,43 +197,40 @@ OBJETIVO: Reduzir PA ≤ 25% nas primeiras horas
   }
 ];
 
-// ── Seed automático se banco vazio ────────────────────────
 async function dbInit() {
-  const snap = await getDocs(collection(db, COL));
+  const snap = await db.collection(COL).limit(1).get();
   if (snap.empty) {
     for (const item of SEED_DATA) {
-      await addDoc(collection(db, COL), item);
+      await db.collection(COL).add(item);
     }
   }
 }
 
-// ── CRUD ──────────────────────────────────────────────────
 async function dbGetAll() {
-  const snap = await getDocs(collection(db, COL));
+  const snap = await db.collection(COL).get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 async function dbGetBySector(sector) {
-  const q = query(collection(db, COL), where("sector", "==", sector));
-  const snap = await getDocs(q);
+  const snap = await db.collection(COL).where("sector", "==", sector).get();
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
 async function dbGetById(id) {
-  const all = await dbGetAll();
-  return all.find(p => p.id === id);
+  const doc = await db.collection(COL).doc(id).get();
+  return doc.exists ? { id: doc.id, ...doc.data() } : null;
 }
 
 async function dbAdd(entry) {
-  await addDoc(collection(db, COL), entry);
+  await db.collection(COL).add(entry);
 }
 
 async function dbUpdate(id, updated) {
-  await updateDoc(doc(db, COL, id), updated);
+  await db.collection(COL).doc(id).update(updated);
 }
 
 async function dbDelete(id) {
-  await deleteDoc(doc(db, COL, id));
+  await db.collection(COL).doc(id).delete();
 }
 
 window.dbInit        = dbInit;
