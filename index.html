@@ -68,10 +68,7 @@
         <span class="rx-tag">PRESCRIÇÃO</span>
         <h2 class="rx-title" id="rx-disease-name"></h2>
       </div>
-
-      <!-- ABAS DE VARIANTES -->
       <div id="variant-tabs" class="variant-tabs"></div>
-
       <div class="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -105,6 +102,7 @@
         <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver</button>
         <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
         <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
+        <button class="tab" onclick="switchTab('tab-shortcuts', this)">/ Atalhos</button>
       </div>
 
       <!-- LISTA -->
@@ -132,11 +130,9 @@
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" name="disease" placeholder="ex: Pneumonia" required />
-
           <label>Variantes da Prescrição</label>
           <div id="new-variants-container"></div>
           <button type="button" class="btn-add-variant" onclick="addNewVariantField()">+ Adicionar Variante</button>
-
           <button type="submit" class="btn-save">Salvar Prescrição</button>
         </form>
       </div>
@@ -153,20 +149,53 @@
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" id="edit-disease" required />
-
           <label>Variantes da Prescrição</label>
           <div id="variants-container"></div>
           <button type="button" class="btn-add-variant" onclick="addVariantField()">+ Adicionar Variante</button>
-
           <div style="display:flex;gap:12px;margin-top:8px">
             <button type="submit" class="btn-save">Atualizar</button>
             <button type="button" class="btn-delete" onclick="deletePrescription()">Excluir</button>
           </div>
         </form>
       </div>
+
+      <!-- ATALHOS -->
+      <div id="tab-shortcuts" class="tab-content">
+        <div class="shortcuts-header">
+          <p class="shortcuts-tip">Digite <code>/comando</code> em qualquer campo de prescrição para expandir automaticamente.</p>
+        </div>
+        <div class="admin-list" id="shortcuts-list"></div>
+        <button class="btn-add-variant" style="margin:12px 20px;width:calc(100% - 40px)" onclick="openNewShortcut()">+ Novo Atalho</button>
+      </div>
     </div>
   </div>
 
+  <!-- SHORTCUT EDIT MODAL -->
+  <div id="shortcut-modal" class="modal-overlay" onclick="closeShortcutIfOutside(event)">
+    <div class="modal" style="max-width:500px">
+      <div class="modal-header">
+        <h3 id="shortcut-modal-title">Novo Atalho</h3>
+        <button class="modal-close" onclick="closeShortcutModal()">✕</button>
+      </div>
+      <form class="admin-form" onsubmit="saveShortcut(event)" style="padding:20px">
+        <input type="hidden" id="shortcut-edit-id" />
+        <label>Comando (começa com /)</label>
+        <input type="text" id="shortcut-trigger" placeholder="/meucomando" required />
+        <label>Nome do Atalho</label>
+        <input type="text" id="shortcut-label" placeholder="ex: Analgesia" required />
+        <label>Texto Expandido</label>
+        <div class="textarea-wrap">
+          <textarea id="shortcut-text" rows="8" placeholder="Texto que será inserido..." required></textarea>
+        </div>
+        <div style="display:flex;gap:12px">
+          <button type="submit" class="btn-save">Salvar</button>
+          <button type="button" class="btn-delete" id="shortcut-delete-btn" onclick="deleteShortcut()" style="display:none">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="shortcuts.js"></script>
   <script src="db.js"></script>
   <script src="app.js"></script>
 </body>

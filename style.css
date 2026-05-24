@@ -715,3 +715,56 @@ html, body {
   font-size: 10px;
   color: var(--text-dim);
 }
+
+/* ── Shortcut suggestions ─────────────────────────────── */
+.textarea-wrap { position: relative; }
+
+.shortcut-suggestions {
+  position: absolute;
+  top: 100%; left: 0; right: 0;
+  background: var(--bg2);
+  border: 1.5px solid var(--accent);
+  border-radius: var(--radius-sm);
+  z-index: 50;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+.shortcut-suggestion-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.shortcut-suggestion-item:hover { background: var(--accent-dim); }
+
+.suggestion-trigger {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+  min-width: 120px;
+}
+
+.suggestion-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Shortcuts tab ────────────────────────────────────── */
+.shortcuts-header {
+  padding: 14px 20px 0;
+}
+.shortcuts-tip {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.shortcuts-tip code {
+  font-family: var(--font-mono);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: var(--yellow);
+}
