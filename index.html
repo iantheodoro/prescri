@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Firebase compat (funciona sem módulos ES) -->
+  <!-- Firebase via CDN compat (sem módulos, funciona em qualquer host) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
@@ -102,7 +102,7 @@
       <div class="modal-tabs">
         <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver Prescrições</button>
         <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
-        <button class="tab" onclick="switchTab('tab-edit', this)" id="tab-edit-btn" style="display:none">✎ Editar</button>
+        <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
       </div>
 
       <div id="tab-list" class="tab-content active">

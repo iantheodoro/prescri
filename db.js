@@ -1,14 +1,14 @@
 // ============================================================
-//  db.js — Firebase Firestore via CDN (compat mode)
+//  db.js — Firebase Firestore (projeto receita-ea6a4)
 // ============================================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB3rh1_H4hNFRauNV57_1-aWivG_HF7wUY",
-  authDomain: "qbank-e58b5.firebaseapp.com",
-  projectId: "qbank-e58b5",
-  storageBucket: "qbank-e58b5.firebasestorage.app",
-  messagingSenderId: "968458765807",
-  appId: "1:968458765807:web:65faa5479c03b30532e21a"
+  apiKey: "AIzaSyCuabgnUiFxWOtAbhnm1lPlgQNqbFGZqXo",
+  authDomain: "receita-ea6a4.firebaseapp.com",
+  projectId: "receita-ea6a4",
+  storageBucket: "receita-ea6a4.firebasestorage.app",
+  messagingSenderId: "169846902582",
+  appId: "1:169846902582:web:8d44f2a1eb5ee837672d97"
 };
 
 firebase.initializeApp(firebaseConfig);
@@ -54,7 +54,7 @@ const SEED_DATA = [
 
 3. SEDAÇÃO E ANALGESIA
    - Fentanil 25–100 mcg/h EV contínuo
-   - Midazolam 0,02–0,1 mg/kg/h EV contínuo — RASS alvo: -2 a -3
+   - Midazolam 0,02–0,1 mg/kg/h — RASS alvo: -2 a -3
 
 4. BLOQUEIO NEUROMUSCULAR (primeiras 48h se grave)
    - Cisatracúrio 37,5 mg/h EV contínuo`
@@ -70,7 +70,7 @@ const SEED_DATA = [
    - PAM alvo ≥ 65–80 mmHg
 
 3. NEUROPROTEÇÃO
-   - Cabeceira 30° / Controle glicêmico 140–180 mg/dL
+   - Cabeceira 30° / Glicemia 140–180 mg/dL
    - Evitar hiperoxia: SpO₂ 94–98%
 
 4. CONVULSÕES
@@ -96,8 +96,9 @@ const SEED_DATA = [
    - Morfina 2–4 mg EV (titular dor)
 
 4. SUPORTE
-   - O₂ se SpO₂ < 90% / Monitorização contínua ECG
-   - Acesso venoso calibroso x2 / Desfibrilador à beira-leito
+   - O₂ se SpO₂ < 90%
+   - Monitorização contínua ECG
+   - Acesso venoso calibroso x2
 
 5. BETABLOQUEADOR
    - Metoprolol 25–50 mg VO nas primeiras 24h`
@@ -130,10 +131,12 @@ const SEED_DATA = [
 ⚡ ADRENALINA IMEDIATA
 
 1. ADRENALINA 1ª LINHA
-   - 1:1000 → 0,3–0,5 mg IM (coxa) — repetir 5–15 min se necessário
+   - 1:1000 → 0,3–0,5 mg IM (coxa)
+   - Repetir a cada 5–15 min se necessário
 
 2. SUPORTE
-   - O₂ 8–15 L/min / SF 0,9% 500–1000 mL EV rápido
+   - O₂ 8–15 L/min
+   - SF 0,9% 500–1000 mL EV rápido
 
 3. 2ª LINHA
    - Prometazina 25 mg EV
@@ -158,7 +161,8 @@ const SEED_DATA = [
    - Dipirona 1g VO de 6/6h se febre/dor
 
 3. SUPORTE
-   - Hidratação oral ≥ 1,5 L/dia / Retorno em 48–72h`
+   - Hidratação oral ≥ 1,5 L/dia
+   - Retorno em 48–72h ou antes se piora`
   },
   {
     sector: "Sala Verde", disease: "Crise Hipertensiva — Urgência",
@@ -174,7 +178,8 @@ OBJETIVO: Reduzir PA ≤ 25% nas primeiras horas
    Opção 3: Clonidina 0,1–0,2 mg VO
 
 3. ALTA
-   - Manter medicação habitual / Consulta em 24–48h
+   - Manter medicação habitual
+   - Consulta em 24–48h
    - Retornar SE: cefaleia intensa, déficit neurológico, dor torácica`
   },
   {
@@ -193,16 +198,23 @@ OBJETIVO: Reduzir PA ≤ 25% nas primeiras horas
 
 4. REAVALIAÇÃO 1h
    - Boa resposta → alta com corticoide oral + resgate
-   - Sem resposta → Sala Vermelha`
+   - Sem resposta → transferir Sala Vermelha`
   }
 ];
 
 async function dbInit() {
-  const snap = await db.collection(COL).limit(1).get();
-  if (snap.empty) {
-    for (const item of SEED_DATA) {
-      await db.collection(COL).add(item);
+  try {
+    const snap = await db.collection(COL).limit(1).get();
+    if (snap.empty) {
+      console.log("Banco vazio, inserindo dados iniciais...");
+      for (const item of SEED_DATA) {
+        await db.collection(COL).add(item);
+      }
+      console.log("Dados iniciais inseridos!");
     }
+  } catch(e) {
+    console.error("Erro no dbInit:", e);
+    alert("Erro ao conectar ao banco de dados. Verifique as regras do Firestore.");
   }
 }
 
@@ -217,8 +229,8 @@ async function dbGetBySector(sector) {
 }
 
 async function dbGetById(id) {
-  const doc = await db.collection(COL).doc(id).get();
-  return doc.exists ? { id: doc.id, ...doc.data() } : null;
+  const docSnap = await db.collection(COL).doc(id).get();
+  return docSnap.exists ? { id: docSnap.id, ...docSnap.data() } : null;
 }
 
 async function dbAdd(entry) {
