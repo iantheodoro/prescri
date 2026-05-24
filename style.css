@@ -854,3 +854,231 @@ html, body {
   font-size: 11px;
   color: var(--text-dim);
 }
+
+/* ── Welcome — grupos ─────────────────────────────────── */
+.sector-group-label {
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 500;
+  letter-spacing: 2px; text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+  align-self: flex-start;
+  width: 100%; max-width: 720px;
+}
+
+.sector-grid-special { max-width: 480px; }
+
+.sector-card-special { border-color: rgba(251,191,36,0.3); }
+.sector-card-special:hover {
+  border-color: #fbbf24;
+  background: rgba(251,191,36,0.08);
+  box-shadow: 0 8px 32px rgba(251,191,36,0.15);
+}
+
+/* ── Pediatria screen ─────────────────────────────────── */
+.ped-content {
+  position: relative; z-index: 2;
+  padding: 20px 24px 80px;
+  max-width: 760px; width: 100%; margin: 0 auto;
+}
+
+.ped-tabs {
+  display: flex; gap: 8px; margin-bottom: 20px;
+}
+
+.ped-tab {
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: 99px;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px; font-weight: 700;
+  padding: 9px 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.ped-tab:hover { border-color: #fbbf24; color: var(--text); }
+.ped-tab.active {
+  background: rgba(251,191,36,0.15);
+  border-color: #fbbf24;
+  color: #fbbf24;
+}
+
+.ped-tab-content { display: none; }
+.ped-tab-content.active { display: block; }
+
+/* ── Peso card ────────────────────────────────────────── */
+.ped-weight-card {
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.ped-label {
+  display: block;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.ped-weight-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ped-weight-row input {
+  flex: 1;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 22px; font-weight: 500;
+  padding: 12px 16px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.ped-weight-row input:focus { border-color: #fbbf24; }
+
+.ped-weight-unit {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.ped-weight-card select {
+  width: 100%;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 11px 14px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.ped-weight-card select:focus { border-color: #fbbf24; }
+
+/* ── Resultado ────────────────────────────────────────── */
+.ped-result {
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.ped-result-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-family: var(--font-body);
+  font-size: 15px; font-weight: 700;
+  color: var(--text);
+}
+
+.ped-result-route {
+  font-family: var(--font-mono);
+  font-size: 11px; letter-spacing: 1px;
+  color: #fbbf24;
+  background: rgba(251,191,36,0.1);
+  border: 1px solid rgba(251,191,36,0.3);
+  padding: 3px 10px; border-radius: 99px;
+}
+
+.ped-dose-box {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ped-dose-highlight { background: rgba(251,191,36,0.05); }
+
+.ped-dose-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.ped-dose-value {
+  font-family: var(--font-mono);
+  font-size: 18px; font-weight: 500;
+  color: var(--text);
+}
+
+.ped-dose-highlight .ped-dose-value { color: #fbbf24; font-size: 22px; }
+
+.ped-dose-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ── Apresentações ────────────────────────────────────── */
+.ped-presentations { padding: 14px 18px; border-bottom: 1px solid var(--border); }
+
+.ped-pres-label {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.ped-pres-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.ped-pres-item:last-child { border-bottom: none; }
+
+.ped-pres-name {
+  font-size: 13px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.ped-pres-vol {
+  font-family: var(--font-mono);
+  font-size: 15px; font-weight: 500;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.ped-notes {
+  padding: 12px 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  border-bottom: 1px solid var(--border);
+  font-style: italic;
+}
+
+.btn-copy-ped {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 14px;
+  background: rgba(251,191,36,0.15);
+  border: none;
+  color: #fbbf24;
+  font-family: var(--font-body);
+  font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-copy-ped:hover { background: rgba(251,191,36,0.25); }
+
+/* ── Placeholder ──────────────────────────────────────── */
+.ped-placeholder {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 14px;
+  padding: 60px 24px;
+  color: var(--text-dim);
+  font-size: 14px; text-align: center;
+  line-height: 1.7;
+}
+.ped-placeholder-icon { font-size: 40px; }

@@ -18,22 +18,38 @@
     <div class="welcome-content">
       <div class="logo-badge">RX</div>
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
-      <p class="welcome-sub">Selecione o setor de atendimento para iniciar</p>
+      <p class="welcome-sub">Selecione o setor de atendimento</p>
+
+      <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
-        <button class="sector-card" data-sector="UTI" onclick="selectSector(this)">
-          <div class="sector-icon">🫀</div>
-          <div class="sector-name">UTI</div>
-          <div class="sector-desc">Unidade de Terapia Intensiva</div>
+        <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
+          <div class="sector-icon">🩺</div>
+          <div class="sector-name">Sala Verde</div>
+          <div class="sector-desc">Média complexidade</div>
         </button>
         <button class="sector-card" data-sector="Sala Vermelha" onclick="selectSector(this)">
           <div class="sector-icon">🚨</div>
           <div class="sector-name">Sala Vermelha</div>
           <div class="sector-desc">Emergências críticas</div>
         </button>
-        <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
-          <div class="sector-icon">🩺</div>
-          <div class="sector-name">Sala Verde</div>
-          <div class="sector-desc">Média complexidade</div>
+        <button class="sector-card" data-sector="UTI" onclick="selectSector(this)">
+          <div class="sector-icon">🫀</div>
+          <div class="sector-name">UTI</div>
+          <div class="sector-desc">Terapia Intensiva</div>
+        </button>
+      </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Populações Especiais</div>
+      <div class="sector-grid sector-grid-special">
+        <button class="sector-card sector-card-special" onclick="openPediatria()">
+          <div class="sector-icon">👶</div>
+          <div class="sector-name">Pediatria</div>
+          <div class="sector-desc">Calculadora de doses + prescrições</div>
+        </button>
+        <button class="sector-card sector-card-special" data-sector="GO" onclick="selectSector(this)">
+          <div class="sector-icon">🤰</div>
+          <div class="sector-name">GO</div>
+          <div class="sector-desc">Ginecologia e Obstetrícia</div>
         </button>
       </div>
     </div>
@@ -85,13 +101,92 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════
+       PEDIATRIA SCREEN
+  ═══════════════════════════════════════════════════════ -->
+  <div id="screen-pediatria" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" style="background:rgba(251,191,36,0.15);border-color:#fbbf24;color:#fbbf24">👶 Pediatria</div>
+      <button class="btn-admin" onclick="openAdmin()">⚙ Gerenciar</button>
+    </div>
+
+    <div class="ped-content">
+      <!-- ABAS PEDIATRIA -->
+      <div class="ped-tabs">
+        <button class="ped-tab active" onclick="switchPedTab('ped-calc', this)">🧮 Calculadora</button>
+        <button class="ped-tab" onclick="switchPedTab('ped-rx', this)">📋 Prescrições</button>
+      </div>
+
+      <!-- CALCULADORA -->
+      <div id="ped-calc" class="ped-tab-content active">
+        <div class="ped-weight-card">
+          <label class="ped-label">Peso da criança (kg)</label>
+          <div class="ped-weight-row">
+            <input type="number" id="ped-weight" min="1" max="100" step="0.1"
+              placeholder="ex: 12,5" oninput="calculateDose()" />
+            <span class="ped-weight-unit">kg</span>
+          </div>
+          <label class="ped-label" style="margin-top:12px">Medicamento</label>
+          <select id="ped-drug" onchange="calculateDose()">
+            <option value="">Selecionar medicamento...</option>
+          </select>
+        </div>
+
+        <div id="ped-result" class="ped-result" style="display:none">
+          <div class="ped-result-header">
+            <span id="ped-result-drug"></span>
+            <span class="ped-result-route" id="ped-result-route"></span>
+          </div>
+
+          <div class="ped-dose-box">
+            <div class="ped-dose-label">Dose por kg</div>
+            <div class="ped-dose-value" id="ped-dose-per-kg"></div>
+          </div>
+
+          <div class="ped-dose-box ped-dose-highlight">
+            <div class="ped-dose-label">Dose calculada</div>
+            <div class="ped-dose-value" id="ped-dose-calc"></div>
+            <div class="ped-dose-sub" id="ped-dose-interval"></div>
+          </div>
+
+          <div class="ped-presentations">
+            <div class="ped-pres-label">Volumes / Quantidades por apresentação</div>
+            <div id="ped-pres-list"></div>
+          </div>
+
+          <div class="ped-notes" id="ped-notes"></div>
+
+          <button class="btn-copy-ped" onclick="copyPedResult()">
+            <span>⎘</span> Copiar resultado
+          </button>
+          <div class="copy-feedback" id="ped-copy-feedback">✓ Copiado!</div>
+        </div>
+
+        <div id="ped-placeholder" class="ped-placeholder">
+          <div class="ped-placeholder-icon">⚖️</div>
+          <p>Insira o peso e selecione o medicamento para calcular a dose</p>
+        </div>
+      </div>
+
+      <!-- PRESCRIÇÕES PEDIÁTRICAS -->
+      <div id="ped-rx" class="ped-tab-content">
+        <div class="search-wrap" style="padding:0 0 16px">
+          <input type="text" id="ped-search" placeholder="Buscar diagnóstico pediátrico..." oninput="filterPedDiseases()" />
+        </div>
+        <div class="disease-list" id="ped-disease-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- LOADING -->
   <div id="loading" class="loading-overlay">
     <div class="loading-spinner"></div>
     <span>Carregando...</span>
   </div>
 
-  <!-- SHORTCUT PICKER PANEL -->
+  <!-- SHORTCUT PICKER -->
   <div id="shortcut-picker" class="shortcut-picker-overlay" onclick="closeShortcutIfBg(event)">
     <div class="shortcut-picker-panel">
       <div class="shortcut-picker-header">
@@ -120,9 +215,11 @@
         <div class="admin-filter">
           <select id="admin-sector-filter" onchange="renderAdminList()">
             <option value="">Todos os setores</option>
-            <option value="UTI">UTI</option>
-            <option value="Sala Vermelha">Sala Vermelha</option>
             <option value="Sala Verde">Sala Verde</option>
+            <option value="Sala Vermelha">Sala Vermelha</option>
+            <option value="UTI">UTI</option>
+            <option value="Pediatria">Pediatria</option>
+            <option value="GO">GO</option>
           </select>
         </div>
         <div class="admin-list" id="admin-list"></div>
@@ -133,9 +230,11 @@
           <label>Setor</label>
           <select name="sector" required>
             <option value="">Selecionar...</option>
-            <option value="UTI">UTI</option>
-            <option value="Sala Vermelha">Sala Vermelha</option>
             <option value="Sala Verde">Sala Verde</option>
+            <option value="Sala Vermelha">Sala Vermelha</option>
+            <option value="UTI">UTI</option>
+            <option value="Pediatria">Pediatria</option>
+            <option value="GO">GO</option>
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" name="disease" placeholder="ex: Pneumonia" required />
@@ -151,9 +250,11 @@
           <input type="hidden" id="edit-id" />
           <label>Setor</label>
           <select id="edit-sector" required>
-            <option value="UTI">UTI</option>
-            <option value="Sala Vermelha">Sala Vermelha</option>
             <option value="Sala Verde">Sala Verde</option>
+            <option value="Sala Vermelha">Sala Vermelha</option>
+            <option value="UTI">UTI</option>
+            <option value="Pediatria">Pediatria</option>
+            <option value="GO">GO</option>
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" id="edit-disease" required />
@@ -169,7 +270,7 @@
 
       <div id="tab-shortcuts" class="tab-content">
         <div class="shortcuts-header">
-          <p class="shortcuts-tip">Clique em <strong>+ Inserir Bloco</strong> em qualquer campo de prescrição para adicionar rapidamente.</p>
+          <p class="shortcuts-tip">Clique em <strong>⊕ Inserir Bloco</strong> ao editar uma prescrição para inserir rapidamente.</p>
         </div>
         <div class="admin-list" id="shortcuts-list"></div>
         <button class="btn-add-variant" style="margin:12px 20px;width:calc(100% - 40px)" onclick="openNewShortcut()">+ Novo Atalho</button>
@@ -189,7 +290,7 @@
         <label>Nome do Atalho</label>
         <input type="text" id="shortcut-label" placeholder="ex: 💊 Analgesia" required />
         <label>Texto Expandido</label>
-        <textarea id="shortcut-text" rows="9" placeholder="Texto que será inserido no campo..." required></textarea>
+        <textarea id="shortcut-text" rows="9" placeholder="Texto que será inserido..." required></textarea>
         <div style="display:flex;gap:12px">
           <button type="submit" class="btn-save">Salvar</button>
           <button type="button" class="btn-delete" id="shortcut-delete-btn" onclick="deleteShortcut()" style="display:none">Excluir</button>
@@ -199,6 +300,7 @@
   </div>
 
   <script src="shortcuts.js"></script>
+  <script src="pediatria.js"></script>
   <script src="db.js"></script>
   <script src="app.js"></script>
 </body>
