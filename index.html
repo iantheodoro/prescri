@@ -7,8 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Firebase via CDN compat (sem módulos, funciona em qualquer host) -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
@@ -70,6 +68,10 @@
         <span class="rx-tag">PRESCRIÇÃO</span>
         <h2 class="rx-title" id="rx-disease-name"></h2>
       </div>
+
+      <!-- ABAS DE VARIANTES -->
+      <div id="variant-tabs" class="variant-tabs"></div>
+
       <div class="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -86,7 +88,7 @@
     </div>
   </div>
 
-  <!-- LOADING OVERLAY -->
+  <!-- LOADING -->
   <div id="loading" class="loading-overlay">
     <div class="loading-spinner"></div>
     <span>Carregando...</span>
@@ -100,11 +102,12 @@
         <button class="modal-close" onclick="closeAdmin()">✕</button>
       </div>
       <div class="modal-tabs">
-        <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver Prescrições</button>
+        <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver</button>
         <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
         <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
       </div>
 
+      <!-- LISTA -->
       <div id="tab-list" class="tab-content active">
         <div class="admin-filter">
           <select id="admin-sector-filter" onchange="renderAdminList()">
@@ -117,6 +120,7 @@
         <div class="admin-list" id="admin-list"></div>
       </div>
 
+      <!-- NOVA PRESCRIÇÃO -->
       <div id="tab-add" class="tab-content">
         <form class="admin-form" onsubmit="saveNewPrescription(event)">
           <label>Setor</label>
@@ -127,13 +131,17 @@
             <option value="Sala Verde">Sala Verde</option>
           </select>
           <label>Nome da Doença / Diagnóstico</label>
-          <input type="text" name="disease" placeholder="ex: Sepse" required />
-          <label>Prescrição Médica</label>
-          <textarea name="prescription" rows="10" placeholder="Digite a prescrição completa aqui..." required></textarea>
+          <input type="text" name="disease" placeholder="ex: Pneumonia" required />
+
+          <label>Variantes da Prescrição</label>
+          <div id="new-variants-container"></div>
+          <button type="button" class="btn-add-variant" onclick="addNewVariantField()">+ Adicionar Variante</button>
+
           <button type="submit" class="btn-save">Salvar Prescrição</button>
         </form>
       </div>
 
+      <!-- EDITAR -->
       <div id="tab-edit" class="tab-content">
         <form class="admin-form" onsubmit="updatePrescription(event)">
           <input type="hidden" id="edit-id" />
@@ -145,9 +153,12 @@
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" id="edit-disease" required />
-          <label>Prescrição Médica</label>
-          <textarea id="edit-prescription" rows="10" required></textarea>
-          <div style="display:flex;gap:12px">
+
+          <label>Variantes da Prescrição</label>
+          <div id="variants-container"></div>
+          <button type="button" class="btn-add-variant" onclick="addVariantField()">+ Adicionar Variante</button>
+
+          <div style="display:flex;gap:12px;margin-top:8px">
             <button type="submit" class="btn-save">Atualizar</button>
             <button type="button" class="btn-delete" onclick="deletePrescription()">Excluir</button>
           </div>

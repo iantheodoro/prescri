@@ -1,5 +1,5 @@
 // ============================================================
-//  db.js — Firebase Firestore (projeto receita-ea6a4)
+//  db.js — Firebase Firestore com suporte a variantes
 // ============================================================
 
 const firebaseConfig = {
@@ -15,10 +15,141 @@ firebase.initializeApp(firebaseConfig);
 const db  = firebase.firestore();
 const COL = "prescricoes";
 
+// Estrutura: cada prescrição tem "variants": [ { label, text }, ... ]
+// Se tiver só uma variante, não mostra abas
+
 const SEED_DATA = [
   {
-    sector: "UTI", disease: "Sepse / Choque Séptico",
-    prescription: `PRESCRIÇÃO MÉDICA — SEPSE / CHOQUE SÉPTICO
+    sector: "Sala Verde",
+    disease: "Pneumonia Adquirida na Comunidade (PAC)",
+    variants: [
+      {
+        label: "Sem Comorbidades",
+        text: `USO ORAL:
+
+1) Amoxicilina 500 mg — 15 comprimidos
+   Tomar 1 comprimido, via oral, de 8 em 8 horas (3x ao dia) por 5 dias
+
+2) Dipirona 1g — 20 comprimidos
+   Tomar 1 comprimido, via oral, de 6 em 6 horas (4x ao dia) se febre ou dor
+
+INDICAÇÕES MÉDICAS:
+
+1) Hidratação oral — 1,5 L por dia
+   Tomar 1,5 litro de água ou sucos naturais.
+   Não entram: refrigerantes, bebidas alcoólicas ou alimentos.
+
+2) Retorno em 48–72h ou antes se piora do quadro.
+   Atenção aos sinais de piora: tosse com sangue, sensação de desmaio,
+   dificuldade para respirar. Procure novamente o Pronto Socorro.`
+      },
+      {
+        label: "Com Comorbidades",
+        text: `USO ORAL:
+
+1) Amoxicilina-Clavulanato 875/125 mg — 10 comprimidos
+   Tomar 1 comprimido, via oral, de 12 em 12 horas (2x ao dia) por 5 dias
+
+2) Azitromicina 500 mg — 3 comprimidos
+   Tomar 1 comprimido, via oral, a cada 24 horas (1x ao dia) por 3 dias
+
+INDICAÇÕES MÉDICAS:
+
+1) Hidratação oral — 1,5 L por dia
+   Tomar 1,5 litro de água ou sucos naturais.
+   Não entram: refrigerantes, bebidas alcoólicas ou alimentos.
+
+2) Retorno em 48–72h ou antes se piora do quadro.
+   Atenção aos sinais de piora: tosse com sangue, sensação de desmaio,
+   dificuldade para respirar. Procure novamente o Pronto Socorro.`
+      },
+      {
+        label: "Alergia a Penicilina",
+        text: `USO ORAL:
+
+1) Levofloxacino 750 mg — 5 comprimidos
+   Tomar 1 comprimido, via oral, a cada 24 horas (1x ao dia) por 5 dias
+
+INDICAÇÕES MÉDICAS:
+
+1) Hidratação oral — 1,5 L por dia
+   Tomar 1,5 litro de água ou sucos naturais.
+   Não entram: refrigerantes, bebidas alcoólicas ou alimentos.
+
+2) Retorno em 48–72h ou antes se piora do quadro.
+   Atenção aos sinais de piora: tosse com sangue, sensação de desmaio,
+   dificuldade para respirar. Procure novamente o Pronto Socorro.`
+      }
+    ]
+  },
+  {
+    sector: "Sala Verde",
+    disease: "Crise Hipertensiva — Urgência",
+    variants: [
+      {
+        label: "1ª Escolha",
+        text: `USO ORAL:
+
+1) Captopril 25 mg — 1 comprimido
+   Tomar 1 comprimido sublingual (sob a língua) agora.
+   Pode repetir após 30 minutos se PA persistir elevada.
+
+INDICAÇÕES MÉDICAS:
+
+1) Repouso em ambiente calmo por 20–30 minutos.
+2) Consulta ambulatorial em 24–48h.
+3) Manter medicação anti-hipertensiva habitual regularmente.
+4) Retornar SE: cefaleia intensa, déficit neurológico, dor torácica, falta de ar.`
+      },
+      {
+        label: "FC Elevada",
+        text: `USO ORAL:
+
+1) Atenolol 25 mg — 1 comprimido
+   Tomar 1 comprimido, via oral, agora.
+
+INDICAÇÕES MÉDICAS:
+
+1) Repouso em ambiente calmo por 20–30 minutos.
+2) Consulta ambulatorial em 24–48h.
+3) Manter medicação anti-hipertensiva habitual regularmente.
+4) Retornar SE: cefaleia intensa, déficit neurológico, dor torácica, falta de ar.`
+      }
+    ]
+  },
+  {
+    sector: "Sala Verde",
+    disease: "Crise Asmática — Leve a Moderada",
+    variants: [
+      {
+        label: "Prescrição",
+        text: `USO INALATÓRIO:
+
+1) Salbutamol (Aerolin) spray — 4 a 8 jatos com espaçador
+   Aplicar agora. Repetir a cada 20 minutos por até 3 doses.
+
+USO ORAL:
+
+2) Prednisolona 20 mg — 3 comprimidos (60 mg dose única)
+   Tomar 3 comprimidos, via oral, agora (dose única matinal).
+   Continuar 1 comprimido ao dia por mais 4 dias.
+
+INDICAÇÕES MÉDICAS:
+
+1) Usar o spray de alívio (Salbutamol) somente quando sentir falta de ar.
+2) Retorno em 24–48h ou antes se piora.
+3) Retornar IMEDIATAMENTE se: não conseguir falar frases completas,
+   lábios azulados, falta de ar em repouso.`
+      }
+    ]
+  },
+  {
+    sector: "UTI",
+    disease: "Sepse / Choque Séptico",
+    variants: [
+      {
+        label: "Prescrição",
+        text: `PRESCRIÇÃO MÉDICA — SEPSE / CHOQUE SÉPTICO
 
 1. CRISTALOIDE
    - SF 0,9% 30 mL/kg EV em bolus (reavaliação a cada 30 min)
@@ -38,10 +169,16 @@ const SEED_DATA = [
    - Lactato sérico a cada 2h
    - Hemocultura 2 pares ANTES dos antibióticos
    - Débito urinário ≥ 0,5 mL/kg/h`
+      }
+    ]
   },
   {
-    sector: "UTI", disease: "Síndrome de Angústia Respiratória Aguda (SARA)",
-    prescription: `PRESCRIÇÃO MÉDICA — SARA
+    sector: "UTI",
+    disease: "Síndrome de Angústia Respiratória Aguda (SARA)",
+    variants: [
+      {
+        label: "Prescrição",
+        text: `PRESCRIÇÃO MÉDICA — SARA
 
 1. VENTILAÇÃO PROTETORA
    - Volume corrente: 4–6 mL/kg (peso predito)
@@ -58,10 +195,16 @@ const SEED_DATA = [
 
 4. BLOQUEIO NEUROMUSCULAR (primeiras 48h se grave)
    - Cisatracúrio 37,5 mg/h EV contínuo`
+      }
+    ]
   },
   {
-    sector: "UTI", disease: "Parada Cardiorrespiratória — Pós-Ressuscitação",
-    prescription: `PRESCRIÇÃO MÉDICA — PÓS-PCR
+    sector: "UTI",
+    disease: "Parada Cardiorrespiratória — Pós-Ressuscitação",
+    variants: [
+      {
+        label: "Prescrição",
+        text: `PRESCRIÇÃO MÉDICA — PÓS-PCR
 
 1. CONTROLE TEMPERATURA
    - Hipotermia terapêutica: 32–36°C por 24h
@@ -78,10 +221,16 @@ const SEED_DATA = [
 
 5. INVESTIGAR CAUSA
    - ECG, troponina, CATE precoce se IAMCSST`
+      }
+    ]
   },
   {
-    sector: "Sala Vermelha", disease: "Infarto Agudo do Miocárdio com Supra de ST (IAMCSST)",
-    prescription: `PRESCRIÇÃO MÉDICA — IAMCSST
+    sector: "Sala Vermelha",
+    disease: "Infarto Agudo do Miocárdio com Supra de ST (IAMCSST)",
+    variants: [
+      {
+        label: "Prescrição",
+        text: `PRESCRIÇÃO MÉDICA — IAMCSST
 
 ⚡ OBJETIVO: CATE em < 90 min da chegada
 
@@ -102,31 +251,61 @@ const SEED_DATA = [
 
 5. BETABLOQUEADOR
    - Metoprolol 25–50 mg VO nas primeiras 24h`
+      }
+    ]
   },
   {
-    sector: "Sala Vermelha", disease: "Acidente Vascular Cerebral Isquêmico (AVCi)",
-    prescription: `PRESCRIÇÃO MÉDICA — AVCI AGUDO
+    sector: "Sala Vermelha",
+    disease: "Acidente Vascular Cerebral Isquêmico (AVCi)",
+    variants: [
+      {
+        label: "Com Trombólise",
+        text: `PRESCRIÇÃO MÉDICA — AVCI COM TROMBÓLISE
 
-⚡ OBJETIVO: Trombólise em < 60 min da chegada
+⚡ OBJETIVO: Alteplase em < 60 min da chegada
 
 1. AVALIAÇÃO RÁPIDA
    - TC de crânio sem contraste URGENTE
    - Glicemia capilar, coagulograma, ECG, NIHSS
 
-2. TROMBÓLISE EV (se elegível, < 4,5h)
+2. TROMBÓLISE EV (< 4,5h do início)
    - Alteplase 0,9 mg/kg EV (max 90 mg)
    - 10% em bolus → 90% em 60 min
 
 3. CONTROLE PRESSÓRICO
-   - Com trombólise: PA < 180/105
-   - Sem trombólise: tratar se PA > 220/120
+   - Manter PA < 180/105 mmHg
 
-4. ANTITROMBÓTICO (24h após trombólise)
-   - AAS 300 mg VO → 100 mg/dia + Atorvastatina 40–80 mg`
+4. ANTITROMBÓTICO (iniciar 24h após)
+   - AAS 300 mg VO → 100 mg/dia
+   - Atorvastatina 40–80 mg`
+      },
+      {
+        label: "Sem Trombólise",
+        text: `PRESCRIÇÃO MÉDICA — AVCI SEM TROMBÓLISE
+
+1. AVALIAÇÃO
+   - TC de crânio sem contraste URGENTE
+   - Glicemia capilar, coagulograma, ECG, NIHSS
+
+2. CONTROLE PRESSÓRICO
+   - Tratar apenas se PA > 220/120 mmHg
+
+3. ANTITROMBÓTICO (iniciar imediatamente)
+   - AAS 300 mg VO → 100 mg/dia
+   - Atorvastatina 40–80 mg
+
+4. GLICEMIA
+   - Alvo: 140–180 mg/dL`
+      }
+    ]
   },
   {
-    sector: "Sala Vermelha", disease: "Anafilaxia",
-    prescription: `PRESCRIÇÃO MÉDICA — ANAFILAXIA
+    sector: "Sala Vermelha",
+    disease: "Anafilaxia",
+    variants: [
+      {
+        label: "Prescrição",
+        text: `PRESCRIÇÃO MÉDICA — ANAFILAXIA
 
 ⚡ ADRENALINA IMEDIATA
 
@@ -146,59 +325,8 @@ const SEED_DATA = [
    - Salbutamol NBZ 5 mg
 
 5. MONITORIZAÇÃO 4–8h após resolução`
-  },
-  {
-    sector: "Sala Verde", disease: "Pneumonia Adquirida na Comunidade (PAC) — Leve",
-    prescription: `PRESCRIÇÃO MÉDICA — PAC LEVE
-
-1. ANTIBIOTICOTERAPIA
-   A (sem comorbidades): Amoxicilina 500 mg VO 8/8h × 5–7 dias
-   B (com comorbidades): Amoxicilina-Clavulanato 875/125 mg 12/12h
-                        + Azitromicina 500 mg/dia × 5 dias
-   C (alergia penicilina): Levofloxacino 750 mg/dia × 5 dias
-
-2. SINTOMÁTICOS
-   - Dipirona 1g VO de 6/6h se febre/dor
-
-3. SUPORTE
-   - Hidratação oral ≥ 1,5 L/dia
-   - Retorno em 48–72h ou antes se piora`
-  },
-  {
-    sector: "Sala Verde", disease: "Crise Hipertensiva — Urgência",
-    prescription: `PRESCRIÇÃO MÉDICA — URGÊNCIA HIPERTENSIVA
-
-OBJETIVO: Reduzir PA ≤ 25% nas primeiras horas
-
-1. REPOUSO 20–30 min antes de 2ª medida
-
-2. MEDICAÇÃO VO
-   Opção 1: Captopril 25 mg SL ou VO
-   Opção 2: Atenolol 25–50 mg VO (se FC elevada)
-   Opção 3: Clonidina 0,1–0,2 mg VO
-
-3. ALTA
-   - Manter medicação habitual
-   - Consulta em 24–48h
-   - Retornar SE: cefaleia intensa, déficit neurológico, dor torácica`
-  },
-  {
-    sector: "Sala Verde", disease: "Crise Asmática — Leve a Moderada",
-    prescription: `PRESCRIÇÃO MÉDICA — ASMA LEVE A MODERADA
-
-1. BRONCODILATADOR (imediato)
-   - Salbutamol 2,5 mg NBZ a cada 20 min (3 doses)
-   + Ipratrópio 0,25 mg NBZ junto
-
-2. CORTICOIDE
-   - Prednisolona 1–2 mg/kg VO (max 60 mg) por 3–5 dias
-
-3. OXIGÊNIO
-   - Se SpO₂ < 92% → alvo 93–95%
-
-4. REAVALIAÇÃO 1h
-   - Boa resposta → alta com corticoide oral + resgate
-   - Sem resposta → transferir Sala Vermelha`
+      }
+    ]
   }
 ];
 
@@ -206,11 +334,9 @@ async function dbInit() {
   try {
     const snap = await db.collection(COL).limit(1).get();
     if (snap.empty) {
-      console.log("Banco vazio, inserindo dados iniciais...");
       for (const item of SEED_DATA) {
         await db.collection(COL).add(item);
       }
-      console.log("Dados iniciais inseridos!");
     }
   } catch(e) {
     console.error("Erro no dbInit:", e);
