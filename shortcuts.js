@@ -1,5 +1,5 @@
 // ============================================================
-//  shortcuts.js — Sistema de atalhos de texto (/comando)
+//  shortcuts.js — Atalhos de texto clicáveis
 // ============================================================
 
 const SHORTCUTS_KEY = "prescricoes_shortcuts";
@@ -8,7 +8,7 @@ const DEFAULT_SHORTCUTS = [
   {
     id: "analgesia",
     trigger: "/analgesia",
-    label: "Analgesia",
+    label: "💊 Analgesia",
     text: `3) Dipirona 1g ---------------------------------- 20 comprimidos
    Tomar 1 comprimido via oral a cada 6 horas, se necessário, para dor.
 
@@ -21,7 +21,7 @@ const DEFAULT_SHORTCUTS = [
   {
     id: "antiemetico",
     trigger: "/antiemetico",
-    label: "Antiemético",
+    label: "🤢 Antiemético",
     text: `) Metoclopramida 10mg --------------------------- 15 comprimidos
    Tomar 1 comprimido via oral, 30 minutos antes das refeições, por 5 dias.
 
@@ -33,7 +33,7 @@ const DEFAULT_SHORTCUTS = [
   {
     id: "omeprazol",
     trigger: "/omeprazol",
-    label: "Protetor Gástrico",
+    label: "🛡 Protetor Gástrico",
     text: `) Omeprazol 20mg -------------------------------- 30 comprimidos
    Tomar 1 comprimido via oral em jejum, 30 minutos antes do café da manhã,
    por 30 dias.`
@@ -41,7 +41,7 @@ const DEFAULT_SHORTCUTS = [
   {
     id: "retorno",
     trigger: "/retorno",
-    label: "Orientação de Retorno",
+    label: "📅 Orientação de Retorno",
     text: `ORIENTAÇÕES:
 
 Retornar ao Pronto Socorro IMEDIATAMENTE se apresentar:
@@ -56,7 +56,7 @@ Retorno ambulatorial em: ______ dias.`
   {
     id: "hidratacao",
     trigger: "/hidratacao",
-    label: "Hidratação Oral",
+    label: "💧 Hidratação Oral",
     text: `INDICAÇÃO MÉDICA:
 
 ) Hidratação oral — mínimo 1,5 litros por dia
@@ -66,7 +66,7 @@ Retorno ambulatorial em: ______ dias.`
   {
     id: "repouso",
     trigger: "/repouso",
-    label: "Repouso",
+    label: "🛏 Repouso",
     text: `INDICAÇÃO MÉDICA:
 
 ) Repouso relativo por ______ dias.
@@ -76,7 +76,7 @@ Retorno ambulatorial em: ______ dias.`
   {
     id: "antibiotico",
     trigger: "/antibiotico",
-    label: "Alerta Antibiótico",
+    label: "⚠️ Alerta Antibiótico",
     text: `⚠ ATENÇÃO — USO DE ANTIBIÓTICO:
    Tomar todos os comprimidos até acabar, mesmo que melhore antes.
    Não interromper o tratamento sem orientação médica.
@@ -115,81 +115,59 @@ function shortcutsDelete(id) {
   shortcutsSave(list);
 }
 
-// Aplicar atalho em um textarea
-function applyShortcuts(textarea) {
-  const shortcuts = shortcutsGetAll();
-  let val = textarea.value;
-  let changed = false;
-
-  shortcuts.forEach(s => {
-    if (val.includes(s.trigger)) {
-      val = val.replace(s.trigger, s.text);
-      changed = true;
-    }
-  });
-
-  if (changed) {
-    textarea.value = val;
-    // Mover cursor para o fim
-    textarea.selectionStart = textarea.selectionEnd = val.length;
-  }
-  return changed;
-}
-
-// Detectar /comando sendo digitado e mostrar sugestão
-function detectShortcutSuggestion(textarea, suggestionEl) {
-  const val = textarea.value;
-  const cursorPos = textarea.selectionStart;
-  const textBeforeCursor = val.substring(0, cursorPos);
-  const match = textBeforeCursor.match(/\/\w*$/);
-
-  if (!match) {
-    suggestionEl.style.display = "none";
-    return;
-  }
-
-  const typed = match[0].toLowerCase();
-  const shortcuts = shortcutsGetAll();
-  const matches = shortcuts.filter(s => s.trigger.startsWith(typed));
-
-  if (matches.length === 0) {
-    suggestionEl.style.display = "none";
-    return;
-  }
-
-  suggestionEl.innerHTML = matches.map(s => `
-    <div class="shortcut-suggestion-item" onclick="applySuggestion(this, '${s.trigger}')">
-      <span class="suggestion-trigger">${s.trigger}</span>
-      <span class="suggestion-label">${s.label}</span>
-    </div>
-  `).join("");
-  suggestionEl.style.display = "block";
-  suggestionEl._textarea = textarea;
-  suggestionEl._typed = match[0];
-}
-
-function applySuggestion(el, trigger) {
-  const suggestionEl = el.closest(".shortcut-suggestions");
-  const textarea = suggestionEl._textarea;
-  const typed = suggestionEl._typed;
-  const shortcuts = shortcutsGetAll();
-  const s = shortcuts.find(x => x.trigger === trigger);
-  if (!s || !textarea) return;
-
-  const cursorPos = textarea.selectionStart;
-  const val = textarea.value;
-  const before = val.substring(0, cursorPos - typed.length);
-  const after  = val.substring(cursorPos);
-  textarea.value = before + s.text + after;
+// Insere texto na posição atual do cursor no textarea
+function insertAtCursor(textarea, text) {
+  const start = textarea.selectionStart;
+  const end   = textarea.selectionEnd;
+  const before = textarea.value.substring(0, start);
+  const after  = textarea.value.substring(end);
+  // Adiciona quebra de linha antes se não estiver no início
+  const prefix = (before.length > 0 && !before.endsWith("\n")) ? "\n\n" : "";
+  textarea.value = before + prefix + text + "\n" + after;
+  // Posiciona cursor após o texto inserido
+  const newPos = start + prefix.length + text.length + 1;
+  textarea.selectionStart = textarea.selectionEnd = newPos;
   textarea.focus();
-  suggestionEl.style.display = "none";
 }
 
-window.shortcutsGetAll          = shortcutsGetAll;
-window.shortcutsSave            = shortcutsSave;
-window.shortcutsAdd             = shortcutsAdd;
-window.shortcutsUpdate          = shortcutsUpdate;
-window.shortcutsDelete          = shortcutsDelete;
-window.applyShortcuts           = applyShortcuts;
-window.detectShortcutSuggestion = detectShortcutSuggestion;
-window.applySuggestion          = applySuggestion;
+// Abre o painel de atalhos ligado a um textarea
+let _activeTextarea = null;
+
+function openShortcutPicker(textarea) {
+  _activeTextarea = textarea;
+  const panel = document.getElementById("shortcut-picker");
+  renderShortcutPicker();
+  panel.classList.add("open");
+}
+
+function closeShortcutPicker() {
+  document.getElementById("shortcut-picker").classList.remove("open");
+}
+
+function renderShortcutPicker() {
+  const list = document.getElementById("shortcut-picker-list");
+  const all  = shortcutsGetAll();
+  list.innerHTML = all.map(s => `
+    <button class="picker-item" onclick="pickShortcut('${s.id}')">
+      <span class="picker-label">${s.label}</span>
+      <span class="picker-trigger">${s.trigger}</span>
+    </button>
+  `).join("");
+}
+
+function pickShortcut(id) {
+  const s = shortcutsGetAll().find(x => x.id === id);
+  if (!s || !_activeTextarea) return;
+  insertAtCursor(_activeTextarea, s.text);
+  closeShortcutPicker();
+}
+
+window.shortcutsGetAll      = shortcutsGetAll;
+window.shortcutsSave        = shortcutsSave;
+window.shortcutsAdd         = shortcutsAdd;
+window.shortcutsUpdate      = shortcutsUpdate;
+window.shortcutsDelete      = shortcutsDelete;
+window.openShortcutPicker   = openShortcutPicker;
+window.closeShortcutPicker  = closeShortcutPicker;
+window.renderShortcutPicker = renderShortcutPicker;
+window.pickShortcut         = pickShortcut;
