@@ -129,6 +129,12 @@ function formatPedNumber(value, digits = 1) {
   return Number(value.toFixed(digits)).toLocaleString("pt-BR", { maximumFractionDigits: digits });
 }
 
+function formatPedDoseValue(value, unit) {
+  if (!Number.isFinite(value)) return "";
+  const rounded = unit === "gotas" ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${formatPedNumber(rounded)} ${unit}`;
+}
+
 function escapeHtml(value = "") {
   return String(value)
     .replace(/&/g, "&amp;")
@@ -219,6 +225,17 @@ function getPediatricCalculation(drug, weight, age) {
   return { dosePerDose, dailyDose, label };
 }
 
+function getPresentationDose(presentation, weight, dosesPerDay = 1) {
+  if (!presentation || !Number.isFinite(weight) || weight <= 0) return "";
+  if (!presentation.calc_format || !presentation.calc_value_per_kg) return "";
+
+  const [unit, , basis] = presentation.calc_format.split("/");
+  const divisor = basis === "total" ? Number(dosesPerDay || 1) : 1;
+  const value = (Number(presentation.calc_value_per_kg) * weight) / divisor;
+  const unitLabel = unit === "gotas" ? "gotas" : unit;
+  return formatPedDoseValue(value, unitLabel);
+}
+
 function buildPediatricMarkerMap() {
   const weight = parseLocaleNumber(pediatricPrescriptionContext.weight);
   const age = parseLocaleNumber(pediatricPrescriptionContext.age);
@@ -240,6 +257,15 @@ function buildPediatricMarkerMap() {
 
     let primaryPresentationDose = "";
     drug.presentations.forEach(p => {
+      const directDose = getPresentationDose(p, weight, drug.doses_per_day || (drug.dose_type === "daily" ? 3 : 1));
+      if (directDose) {
+        const unit = p.calc_format.split("/")[0];
+        const key = unit === "gotas" ? "gotas" : unit.toLowerCase();
+        map[`${drug.id}_${key}`] = directDose;
+        if (!primaryPresentationDose) primaryPresentationDose = directDose;
+        return;
+      }
+
       if (p.dose_fixed_label) {
         map[`${drug.id}_${p.unit}`] = p.dose_fixed_label;
         if (!primaryPresentationDose) primaryPresentationDose = p.dose_fixed_label;
@@ -317,7 +343,7 @@ function renderPedDrugAdmin(selectedId = null) {
         <strong>${escapeHtml(d.name)}</strong>
         <small>{{${escapeHtml(d.id)}_dose}}</small>
       </span>
-      <em>${d.dose_per_kg ? `${escapeHtml(d.dose_per_kg)} mg/kg` : "dose fixa"}</em>
+      <em>${d.presentations?.length || 0} apresentação(ões)</em>
     </button>
   `).join("");
 
@@ -331,8 +357,6 @@ function newPedDrug() {
   document.getElementById("ped-admin-id").value = "";
   document.getElementById("ped-admin-category").value = "";
   document.getElementById("ped-admin-route").value = "VO";
-  document.getElementById("ped-admin-dose").value = "";
-  document.getElementById("ped-admin-dose-max").value = "";
   document.getElementById("ped-admin-doses-per-day").value = "1";
   document.getElementById("ped-admin-interval").value = "";
   document.getElementById("ped-admin-notes").value = "";
@@ -350,8 +374,6 @@ function editPedDrug(id) {
   document.getElementById("ped-admin-id").value = drug.id || "";
   document.getElementById("ped-admin-category").value = drug.category || "";
   document.getElementById("ped-admin-route").value = drug.route || "";
-  document.getElementById("ped-admin-dose").value = drug.dose_per_kg ?? "";
-  document.getElementById("ped-admin-dose-max").value = drug.dose_max ?? "";
   document.getElementById("ped-admin-doses-per-day").value = drug.doses_per_day || (drug.dose_type === "daily" ? 3 : 1);
   document.getElementById("ped-admin-interval").value = drug.interval || "";
   document.getElementById("ped-admin-notes").value = drug.notes || "";
@@ -369,17 +391,16 @@ function addPedPresentationField(p = {}) {
   const div = document.createElement("div");
   div.className = "ped-presentation-row";
   div.innerHTML = `
-    <input type="text" class="ped-pres-label-input" placeholder="Nome. Ex: Gotas 200 mg/mL" value="${escapeHtml(p.label || "")}" />
-    <select class="ped-pres-kind" onchange="updatePedMarkerPreview()">
-      <option value="ml" ${p.concentration && !p.drop_mg ? "selected" : ""}>mL</option>
-      <option value="gotas" ${p.drop_mg ? "selected" : ""}>gotas</option>
-      <option value="comprimidos" ${p.fixed_mg ? "selected" : ""}>comprimido</option>
-      <option value="fixo" ${p.dose_fixed_label ? "selected" : ""}>texto fixo</option>
+    <input type="text" class="ped-pres-label-input" placeholder="Nome. Ex: Suspensão oral" value="${escapeHtml(p.label || "")}" />
+    <select class="ped-pres-format" onchange="updatePedMarkerPreview()">
+      <option value="gotas/kg/dose" ${p.calc_format === "gotas/kg/dose" ? "selected" : ""}>gotas/kg/dose</option>
+      <option value="gotas/kg/total" ${p.calc_format === "gotas/kg/total" ? "selected" : ""}>gotas/kg/total</option>
+      <option value="mL/kg/dose" ${p.calc_format === "mL/kg/dose" ? "selected" : ""}>mL/kg/dose</option>
+      <option value="mL/kg/total" ${p.calc_format === "mL/kg/total" ? "selected" : ""}>mL/kg/total</option>
+      <option value="mg/kg/dose" ${p.calc_format === "mg/kg/dose" ? "selected" : ""}>mg/kg/dose</option>
+      <option value="mg/kg/total" ${p.calc_format === "mg/kg/total" ? "selected" : ""}>mg/kg/total</option>
     </select>
-    <input type="number" class="ped-pres-concentration" min="0" step="0.01" placeholder="mg/mL" value="${p.concentration ?? ""}" />
-    <input type="number" class="ped-pres-drop" min="0" step="0.01" placeholder="mg/gota" value="${p.drop_mg ?? ""}" />
-    <input type="number" class="ped-pres-fixed" min="0" step="0.01" placeholder="mg/comp" value="${p.fixed_mg ?? ""}" />
-    <input type="text" class="ped-pres-fixed-label" placeholder="ex: 2-4 jatos" value="${escapeHtml(p.dose_fixed_label || "")}" />
+    <input type="number" class="ped-pres-value-per-kg" min="0" step="0.01" placeholder="valor por kg" value="${p.calc_value_per_kg ?? ""}" />
     ${idx > 0 ? `<button type="button" class="btn-remove-variant" onclick="removePedPresentationField(this)">x</button>` : ""}
   `;
   wrap.appendChild(div);
@@ -394,23 +415,11 @@ function removePedPresentationField(btn) {
 function collectPedPresentations() {
   return [...document.querySelectorAll("#ped-presentations-admin .ped-presentation-row")]
     .map(row => {
-      const kind = row.querySelector(".ped-pres-kind").value;
       const base = { label: row.querySelector(".ped-pres-label-input").value.trim() };
       if (!base.label) return null;
-      if (kind === "gotas") {
-        base.unit = "gotas";
-        base.concentration = parseLocaleNumber(row.querySelector(".ped-pres-concentration").value);
-        base.drop_mg = parseLocaleNumber(row.querySelector(".ped-pres-drop").value);
-      } else if (kind === "comprimidos") {
-        base.unit = "comprimidos";
-        base.fixed_mg = parseLocaleNumber(row.querySelector(".ped-pres-fixed").value);
-      } else if (kind === "fixo") {
-        base.unit = "jatos";
-        base.dose_fixed_label = row.querySelector(".ped-pres-fixed-label").value.trim();
-      } else {
-        base.unit = "mL";
-        base.concentration = parseLocaleNumber(row.querySelector(".ped-pres-concentration").value);
-      }
+      base.calc_format = row.querySelector(".ped-pres-format").value;
+      base.calc_value_per_kg = parseLocaleNumber(row.querySelector(".ped-pres-value-per-kg").value);
+      base.unit = base.calc_format.split("/")[0];
       Object.keys(base).forEach(key => {
         if (Number.isNaN(base[key]) || base[key] === "") delete base[key];
       });
@@ -425,8 +434,8 @@ function getPedAdminDrugFromForm() {
     id,
     name: document.getElementById("ped-admin-name").value.trim(),
     category: document.getElementById("ped-admin-category").value.trim(),
-    dose_per_kg: parseLocaleNumber(document.getElementById("ped-admin-dose").value) || null,
-    dose_max: parseLocaleNumber(document.getElementById("ped-admin-dose-max").value) || null,
+    dose_per_kg: null,
+    dose_max: null,
     interval: document.getElementById("ped-admin-interval").value.trim(),
     max_daily: null,
     weight_min: 1,
@@ -447,8 +456,8 @@ function savePedDrug(e) {
     alert("Preencha nome e código do marcador.");
     return;
   }
-  if (!drug.dose_per_kg && !drug.presentations.some(p => p.dose_fixed_label)) {
-    alert("Informe a dose mg/kg ou uma apresentação com texto fixo.");
+  if (!drug.presentations.length || drug.presentations.some(p => !p.calc_format || !p.calc_value_per_kg)) {
+    alert("Informe o formato e o valor por kg de cada apresentação.");
     return;
   }
 
@@ -487,10 +496,10 @@ function updatePedMarkerPreview() {
   }
   const markers = [`{{${id}_dose}}`, `{{${id}_mg}}`];
   collectPedPresentations().forEach(p => {
-    if (p.drop_mg) markers.push(`{{${id}_gotas}}`);
-    else if (p.fixed_mg) markers.push(`{{${id}_comprimidos}}`);
-    else if (p.concentration) markers.push(`{{${id}_ml}}`);
-    else if (p.dose_fixed_label) markers.push(`{{${id}_${p.unit}}}`);
+    const unit = p.calc_format?.split("/")[0];
+    if (unit === "gotas") markers.push(`{{${id}_gotas}}`);
+    if (unit === "mL") markers.push(`{{${id}_ml}}`);
+    if (unit === "mg") markers.push(`{{${id}_mg}}`);
   });
   el.innerHTML = [...new Set(markers)].map(m => `<code onclick="navigator.clipboard.writeText('${m}')">${m}</code>`).join("");
 }
@@ -802,14 +811,18 @@ function calculateDose() {
   if (!drug) return;
 
   const calc = getPediatricCalculation(drug, weight, age);
-  if (!calc) return;
-  const { dosePerDose, label } = calc;
+  const directPresentations = drug.presentations
+    .map(p => ({ presentation: p, value: getPresentationDose(p, weight, drug.doses_per_day || 1) }))
+    .filter(item => item.value);
+  if (!calc && !directPresentations.length) return;
+  const dosePerDose = calc?.dosePerDose || null;
+  const label = calc?.label || directPresentations[0].value;
 
   // Preencher resultado
   document.getElementById("ped-result-drug").textContent = drug.name;
   document.getElementById("ped-result-route").textContent = drug.route;
   document.getElementById("ped-dose-per-kg").textContent =
-    drug.dose_per_kg ? `${drug.dose_per_kg} mg/kg` : "Dose fixa por faixa etária";
+    drug.dose_per_kg ? `${drug.dose_per_kg} mg/kg` : "Definida por apresentação";
   document.getElementById("ped-dose-calc").textContent = label;
   document.getElementById("ped-dose-interval").textContent = drug.interval;
   document.getElementById("ped-notes").textContent = drug.notes;
@@ -817,6 +830,14 @@ function calculateDose() {
   // Apresentações
   const presList = document.getElementById("ped-pres-list");
   presList.innerHTML = drug.presentations.map(p => {
+    const directDose = getPresentationDose(p, weight, drug.doses_per_day || 1);
+    if (directDose) {
+      return `<div class="ped-pres-item">
+        <span class="ped-pres-name">${p.label}</span>
+        <span class="ped-pres-vol">${directDose}</span>
+      </div>`;
+    }
+    if (!dosePerDose) return "";
     if (p.dose_fixed_label) {
       return `<div class="ped-pres-item">
         <span class="ped-pres-name">${p.label}</span>
