@@ -234,20 +234,23 @@ function buildPediatricMarkerMap() {
     map[`${drug.id}_nome`] = drug.name;
     map[`${drug.id}_rota`] = drug.route;
     map[`${drug.id}_intervalo`] = drug.interval;
-    map[`${drug.id}_dose`] = calc ? calc.label : "";
     map[`${drug.id}_mg`] = calc ? formatPedNumber(calc.dosePerDose) : "";
 
     if (!calc) return;
 
+    let primaryPresentationDose = "";
     drug.presentations.forEach(p => {
       if (p.dose_fixed_label) {
         map[`${drug.id}_${p.unit}`] = p.dose_fixed_label;
+        if (!primaryPresentationDose) primaryPresentationDose = p.dose_fixed_label;
         return;
       }
       if (p.drop_mg) {
         const gotas = Math.round(calc.dosePerDose / p.drop_mg);
-        map[`${drug.id}_gotas`] = `${gotas} gotas`;
+        const value = `${gotas} gotas`;
+        map[`${drug.id}_gotas`] = value;
         map[`${drug.id}_gotas_num`] = String(gotas);
+        if (!primaryPresentationDose) primaryPresentationDose = value;
         return;
       }
       if (p.fixed_mg) {
@@ -256,14 +259,19 @@ function buildPediatricMarkerMap() {
           ? `${comprimidos % 1 === 0 ? comprimidos : comprimidos.toFixed(1)} comprimido(s)`
           : `${comprimidos.toFixed(2)} comprimido`;
         if (!map[`${drug.id}_comprimidos`]) map[`${drug.id}_comprimidos`] = value;
+        if (!primaryPresentationDose) primaryPresentationDose = value;
         return;
       }
       if (p.concentration) {
         const vol = Math.round((calc.dosePerDose / p.concentration) * 10) / 10;
-        if (!map[`${drug.id}_ml`]) map[`${drug.id}_ml`] = `${formatPedNumber(vol)} mL`;
+        const value = `${formatPedNumber(vol)} mL`;
+        if (!map[`${drug.id}_ml`]) map[`${drug.id}_ml`] = value;
         if (!map[`${drug.id}_ml_num`]) map[`${drug.id}_ml_num`] = formatPedNumber(vol);
+        if (!primaryPresentationDose) primaryPresentationDose = value;
       }
     });
+
+    map[`${drug.id}_dose`] = primaryPresentationDose || calc.label;
   });
 
   return map;
