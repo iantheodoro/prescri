@@ -12,14 +12,13 @@
 </head>
 <body>
 
-  <!-- WELCOME SCREEN -->
+  <!-- WELCOME -->
   <div id="screen-welcome" class="screen active">
     <div class="bg-grid"></div>
     <div class="welcome-content">
       <div class="logo-badge">RX</div>
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento</p>
-
       <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
         <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
@@ -38,7 +37,6 @@
           <div class="sector-desc">Terapia Intensiva</div>
         </button>
       </div>
-
       <div class="sector-group-label" style="margin-top:28px">Populações Especiais</div>
       <div class="sector-grid sector-grid-special">
         <button class="sector-card sector-card-special" onclick="openPediatria()">
@@ -55,7 +53,7 @@
     </div>
   </div>
 
-  <!-- DISEASE SELECTION SCREEN -->
+  <!-- DISEASE LIST -->
   <div id="screen-disease" class="screen">
     <div class="bg-grid"></div>
     <div class="top-bar">
@@ -72,7 +70,7 @@
     </div>
   </div>
 
-  <!-- PRESCRIPTION SCREEN -->
+  <!-- PRESCRIPTION -->
   <div id="screen-prescription" class="screen">
     <div class="bg-grid"></div>
     <div class="top-bar">
@@ -101,9 +99,7 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════
-       PEDIATRIA SCREEN
-  ═══════════════════════════════════════════════════════ -->
+  <!-- ═══ PEDIATRIA ═══ -->
   <div id="screen-pediatria" class="screen">
     <div class="bg-grid"></div>
     <div class="top-bar">
@@ -113,55 +109,83 @@
     </div>
 
     <div class="ped-content">
-      <!-- ABAS PEDIATRIA -->
       <div class="ped-tabs">
         <button class="ped-tab active" onclick="switchPedTab('ped-calc', this)">🧮 Calculadora</button>
         <button class="ped-tab" onclick="switchPedTab('ped-rx', this)">📋 Prescrições</button>
+        <button class="ped-tab ped-tab-settings" onclick="openDrugManager()">⚙ Medicamentos</button>
       </div>
 
       <!-- CALCULADORA -->
       <div id="ped-calc" class="ped-tab-content active">
-        <div class="ped-weight-card">
-          <label class="ped-label">Peso da criança (kg)</label>
-          <div class="ped-weight-row">
-            <input type="number" id="ped-weight" min="1" max="100" step="0.1"
-              placeholder="ex: 12,5" oninput="calculateDose()" />
-            <span class="ped-weight-unit">kg</span>
+
+        <!-- INPUTS: peso + idade + medicamento -->
+        <div class="ped-input-card">
+          <div class="ped-input-row">
+            <div class="ped-input-group">
+              <label class="ped-label">Peso (kg)</label>
+              <input type="number" id="ped-weight" min="1" max="100" step="0.1"
+                placeholder="ex: 12" oninput="onPedInput()" />
+            </div>
+            <div class="ped-input-group">
+              <label class="ped-label">Idade (anos)</label>
+              <input type="number" id="ped-age" min="0" max="18" step="0.5"
+                placeholder="ex: 4" oninput="onPedInput()" />
+            </div>
           </div>
           <label class="ped-label" style="margin-top:12px">Medicamento</label>
-          <select id="ped-drug" onchange="calculateDose()">
+          <select id="ped-drug" onchange="onPedInput()">
             <option value="">Selecionar medicamento...</option>
           </select>
         </div>
 
-        <div id="ped-result" class="ped-result" style="display:none">
+        <!-- RESULTADO CALCULADO -->
+        <div id="ped-result" style="display:none">
+
           <div class="ped-result-header">
-            <span id="ped-result-drug"></span>
-            <span class="ped-result-route" id="ped-result-route"></span>
+            <span id="ped-drug-name" class="ped-result-drug-name"></span>
+            <span id="ped-drug-cat" class="ped-result-cat"></span>
           </div>
 
-          <div class="ped-dose-box">
-            <div class="ped-dose-label">Dose por kg</div>
-            <div class="ped-dose-value" id="ped-dose-per-kg"></div>
+          <!-- Dose ajustável -->
+          <div class="ped-section">
+            <div class="ped-section-title">Dose calculada <span class="ped-section-hint">— ajuste se necessário</span></div>
+            <div class="ped-dose-row">
+              <div class="ped-dose-per-kg" id="ped-dose-per-kg-val"></div>
+              <div class="ped-dose-arrow">→</div>
+              <div class="ped-dose-edit">
+                <input type="number" id="ped-dose-mg-input" step="0.1" min="0.1"
+                  onchange="onDoseManualChange()" />
+                <span class="ped-dose-unit">mg</span>
+              </div>
+            </div>
+            <div id="ped-dose-daily" class="ped-dose-daily" style="display:none"></div>
           </div>
 
-          <div class="ped-dose-box ped-dose-highlight">
-            <div class="ped-dose-label">Dose calculada</div>
-            <div class="ped-dose-value" id="ped-dose-calc"></div>
-            <div class="ped-dose-sub" id="ped-dose-interval"></div>
+          <!-- Via de administração -->
+          <div class="ped-section">
+            <div class="ped-section-title">Via de administração</div>
+            <div id="ped-routes" class="ped-routes"></div>
           </div>
 
-          <div class="ped-presentations">
-            <div class="ped-pres-label">Volumes / Quantidades por apresentação</div>
-            <div id="ped-pres-list"></div>
+          <!-- Apresentações -->
+          <div class="ped-section">
+            <div class="ped-section-title">Apresentação <span class="ped-section-hint">— clique para selecionar</span></div>
+            <div id="ped-presentations" class="ped-presentations-grid"></div>
           </div>
 
-          <div class="ped-notes" id="ped-notes"></div>
+          <!-- Prescrição editável -->
+          <div class="ped-section">
+            <div class="ped-section-title">Prescrição gerada <span class="ped-section-hint">— edite à vontade</span></div>
+            <textarea id="ped-rx-textarea" class="ped-rx-textarea" rows="8"
+              placeholder="Selecione peso e medicamento para gerar..."></textarea>
+          </div>
 
-          <button class="btn-copy-ped" onclick="copyPedResult()">
-            <span>⎘</span> Copiar resultado
-          </button>
-          <div class="copy-feedback" id="ped-copy-feedback">✓ Copiado!</div>
+          <div class="rx-actions" style="padding:0 0 24px">
+            <button class="btn-copy" onclick="copyPedRx()">
+              <span class="copy-icon">⎘</span> Copiar Prescrição
+            </button>
+            <div class="copy-feedback" id="ped-copy-feedback">✓ Copiado!</div>
+          </div>
         </div>
 
         <div id="ped-placeholder" class="ped-placeholder">
@@ -210,7 +234,6 @@
         <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
         <button class="tab" onclick="switchTab('tab-shortcuts', this)">/ Atalhos</button>
       </div>
-
       <div id="tab-list" class="tab-content active">
         <div class="admin-filter">
           <select id="admin-sector-filter" onchange="renderAdminList()">
@@ -224,7 +247,6 @@
         </div>
         <div class="admin-list" id="admin-list"></div>
       </div>
-
       <div id="tab-add" class="tab-content">
         <form class="admin-form" onsubmit="saveNewPrescription(event)">
           <label>Setor</label>
@@ -244,7 +266,6 @@
           <button type="submit" class="btn-save">Salvar Prescrição</button>
         </form>
       </div>
-
       <div id="tab-edit" class="tab-content">
         <form class="admin-form" onsubmit="updatePrescription(event)">
           <input type="hidden" id="edit-id" />
@@ -267,10 +288,9 @@
           </div>
         </form>
       </div>
-
       <div id="tab-shortcuts" class="tab-content">
         <div class="shortcuts-header">
-          <p class="shortcuts-tip">Clique em <strong>⊕ Inserir Bloco</strong> ao editar uma prescrição para inserir rapidamente.</p>
+          <p class="shortcuts-tip">Clique em <strong>⊕ Inserir Bloco</strong> ao editar uma prescrição.</p>
         </div>
         <div class="admin-list" id="shortcuts-list"></div>
         <button class="btn-add-variant" style="margin:12px 20px;width:calc(100% - 40px)" onclick="openNewShortcut()">+ Novo Atalho</button>
@@ -299,8 +319,51 @@
     </div>
   </div>
 
+  <!-- DRUG MANAGER MODAL -->
+  <div id="drug-manager-modal" class="modal-overlay" onclick="closeDrugManagerIfBg(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Medicamentos Pediátricos</h3>
+        <button class="modal-close" onclick="closeDrugManager()">✕</button>
+      </div>
+      <div class="modal-tabs">
+        <button class="dm-tab tab active" data-tab="dm-tab-list" onclick="switchDmTab('dm-tab-list', this)">Lista</button>
+        <button class="dm-tab tab" data-tab="dm-tab-edit" id="dm-tab-edit-btn" onclick="switchDmTab('dm-tab-edit', this)" style="display:none">✎ Editar</button>
+      </div>
+      <div id="dm-tab-list" class="dm-tab-content tab-content active">
+        <div class="admin-list" id="drug-manager-list"></div>
+      </div>
+      <div id="dm-tab-edit" class="dm-tab-content tab-content">
+        <form class="admin-form" onsubmit="saveDrugEdit(event)">
+          <div id="dm-edit-title" class="dm-edit-title"></div>
+          <label>Nome</label>
+          <input type="text" id="dm-name" required />
+          <label>Categoria</label>
+          <input type="text" id="dm-category" required />
+          <label>Dose por kg (mg/kg/dose)</label>
+          <input type="number" id="dm-dose-kg" step="0.01" placeholder="ex: 15" />
+          <label>Dose máxima (mg)</label>
+          <input type="number" id="dm-dose-max" step="0.1" placeholder="ex: 1000" />
+          <label>Intervalo</label>
+          <input type="text" id="dm-interval" placeholder="ex: 6/6h" />
+          <label>Duração padrão</label>
+          <input type="text" id="dm-duration" placeholder="ex: 5 dias" />
+          <label>Vias (separar por vírgula)</label>
+          <input type="text" id="dm-routes" placeholder="ex: VO, IM, IV" />
+          <label>Observações</label>
+          <textarea id="dm-notes" rows="3"></textarea>
+          <div style="display:flex;gap:12px">
+            <button type="submit" class="btn-save">Salvar</button>
+            <button type="button" class="btn-delete" id="dm-delete-btn" onclick="deleteDrug()">Excluir</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script src="shortcuts.js"></script>
   <script src="pediatria.js"></script>
+  <script src="ped-ui.js"></script>
   <script src="db.js"></script>
   <script src="app.js"></script>
 </body>
