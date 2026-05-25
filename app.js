@@ -202,10 +202,11 @@ function getPediatricCalculation(drug, weight, age) {
     dosePerDose = bucket.dose;
     label = `${formatPedNumber(dosePerDose)} mg (dose fixa por faixa etária)`;
   } else if (Number.isFinite(weight) && weight > 0 && drug.dose_type === "daily") {
+    const dosesPerDay = Number(drug.doses_per_day || 3);
     const rawDailyDose = drug.dose_per_kg * weight;
     dailyDose = drug.dose_max ? Math.min(rawDailyDose, drug.dose_max) : rawDailyDose;
-    dosePerDose = Math.round((dailyDose / 3) * 10) / 10;
-    label = `${formatPedNumber(dailyDose)} mg/dia -> ${formatPedNumber(dosePerDose)} mg por dose`;
+    dosePerDose = Math.round((dailyDose / dosesPerDay) * 10) / 10;
+    label = `${formatPedNumber(dosePerDose)} mg por dose`;
   } else if (Number.isFinite(weight) && weight > 0 && drug.dose_per_kg) {
     const rawDose = drug.dose_per_kg * weight;
     dosePerDose = drug.dose_max ? Math.min(rawDose, drug.dose_max) : rawDose;
@@ -324,7 +325,7 @@ function newPedDrug() {
   document.getElementById("ped-admin-route").value = "VO";
   document.getElementById("ped-admin-dose").value = "";
   document.getElementById("ped-admin-dose-max").value = "";
-  document.getElementById("ped-admin-dose-type").value = "";
+  document.getElementById("ped-admin-doses-per-day").value = "1";
   document.getElementById("ped-admin-interval").value = "";
   document.getElementById("ped-admin-notes").value = "";
   document.getElementById("ped-admin-delete").style.display = "none";
@@ -343,7 +344,7 @@ function editPedDrug(id) {
   document.getElementById("ped-admin-route").value = drug.route || "";
   document.getElementById("ped-admin-dose").value = drug.dose_per_kg ?? "";
   document.getElementById("ped-admin-dose-max").value = drug.dose_max ?? "";
-  document.getElementById("ped-admin-dose-type").value = drug.dose_type || "";
+  document.getElementById("ped-admin-doses-per-day").value = drug.doses_per_day || (drug.dose_type === "daily" ? 3 : 1);
   document.getElementById("ped-admin-interval").value = drug.interval || "";
   document.getElementById("ped-admin-notes").value = drug.notes || "";
   document.getElementById("ped-admin-delete").style.display = "inline-block";
@@ -425,7 +426,8 @@ function getPedAdminDrugFromForm() {
     presentations: collectPedPresentations(),
     notes: document.getElementById("ped-admin-notes").value.trim(),
     route: document.getElementById("ped-admin-route").value.trim(),
-    dose_type: document.getElementById("ped-admin-dose-type").value || undefined
+    dose_type: "daily",
+    doses_per_day: Number(document.getElementById("ped-admin-doses-per-day").value || 1)
   };
 }
 
@@ -475,7 +477,7 @@ function updatePedMarkerPreview() {
     el.innerHTML = `<code>{{medicamento_dose}}</code>`;
     return;
   }
-  const markers = [`{{${id}_dose}}`, `{{${id}_mg}}`, `{{${id}_intervalo}}`, `{{${id}_rota}}`];
+  const markers = [`{{${id}_dose}}`, `{{${id}_mg}}`];
   collectPedPresentations().forEach(p => {
     if (p.drop_mg) markers.push(`{{${id}_gotas}}`);
     else if (p.fixed_mg) markers.push(`{{${id}_comprimidos}}`);
