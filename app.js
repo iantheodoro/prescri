@@ -9,6 +9,7 @@ let editingId = null;
 let editVariants = [];
 let newEditVariants = [];
 let pediatricPrescriptionContext = { weight: "", age: "" };
+const PED_DRUGS_STORAGE_KEY = "prescricoesmed_pediatric_drugs";
 
 function showLoading() { document.getElementById("loading").classList.add("show"); }
 function hideLoading() { document.getElementById("loading").classList.remove("show"); }
@@ -128,6 +129,23 @@ function formatPedNumber(value, digits = 1) {
   return Number(value.toFixed(digits)).toLocaleString("pt-BR", { maximumFractionDigits: digits });
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function normalizePedDrugId(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 function setupPediatricPrescriptionContext(p) {
   const panel = document.getElementById("rx-ped-context");
   if (!panel) return;
@@ -184,11 +202,13 @@ function getPediatricCalculation(drug, weight, age) {
     dosePerDose = bucket.dose;
     label = `${formatPedNumber(dosePerDose)} mg (dose fixa por faixa etária)`;
   } else if (Number.isFinite(weight) && weight > 0 && drug.dose_type === "daily") {
-    dailyDose = Math.min(drug.dose_per_kg * weight, drug.dose_max);
+    const rawDailyDose = drug.dose_per_kg * weight;
+    dailyDose = drug.dose_max ? Math.min(rawDailyDose, drug.dose_max) : rawDailyDose;
     dosePerDose = Math.round((dailyDose / 3) * 10) / 10;
     label = `${formatPedNumber(dailyDose)} mg/dia -> ${formatPedNumber(dosePerDose)} mg por dose`;
   } else if (Number.isFinite(weight) && weight > 0 && drug.dose_per_kg) {
-    dosePerDose = Math.min(drug.dose_per_kg * weight, drug.dose_max);
+    const rawDose = drug.dose_per_kg * weight;
+    dosePerDose = drug.dose_max ? Math.min(rawDose, drug.dose_max) : rawDose;
     dosePerDose = Math.round(dosePerDose * 10) / 10;
     label = `${formatPedNumber(dosePerDose)} mg`;
   } else {
@@ -248,6 +268,223 @@ function buildPediatricMarkerMap() {
   return map;
 }
 
+// ── Admin visual de medicamentos pediátricos ─────────────
+function loadPedDrugsFromStorage() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PED_DRUGS_STORAGE_KEY) || "null");
+    if (!Array.isArray(saved)) return;
+    PEDIATRIC_DRUGS.splice(0, PEDIATRIC_DRUGS.length, ...saved);
+  } catch(e) {
+    console.warn("Não foi possível carregar medicamentos pediátricos salvos.", e);
+  }
+}
+
+function persistPedDrugs() {
+  localStorage.setItem(PED_DRUGS_STORAGE_KEY, JSON.stringify(PEDIATRIC_DRUGS));
+  renderPedDrugOptions();
+}
+
+function renderPedDrugOptions() {
+  const sel = document.getElementById("ped-drug");
+  if (!sel) return;
+  const selected = sel.value;
+  sel.innerHTML = `<option value="">Selecionar medicamento...</option>`;
+  PEDIATRIC_DRUGS.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d.id;
+    opt.textContent = `${d.name} — ${d.category || "Sem categoria"}`;
+    sel.appendChild(opt);
+  });
+  if (PEDIATRIC_DRUGS.some(d => d.id === selected)) sel.value = selected;
+}
+
+function renderPedDrugAdmin(selectedId = null) {
+  const list = document.getElementById("ped-drug-admin-list");
+  if (!list) return;
+
+  list.innerHTML = PEDIATRIC_DRUGS.map(d => `
+    <button type="button" class="ped-drug-admin-item" onclick="editPedDrug('${d.id}')">
+      <span>
+        <strong>${escapeHtml(d.name)}</strong>
+        <small>{{${escapeHtml(d.id)}_dose}}</small>
+      </span>
+      <em>${d.dose_per_kg ? `${escapeHtml(d.dose_per_kg)} mg/kg` : "dose fixa"}</em>
+    </button>
+  `).join("");
+
+  if (selectedId) editPedDrug(selectedId);
+  else if (!document.getElementById("ped-admin-original-id").value) newPedDrug();
+}
+
+function newPedDrug() {
+  document.getElementById("ped-admin-original-id").value = "";
+  document.getElementById("ped-admin-name").value = "";
+  document.getElementById("ped-admin-id").value = "";
+  document.getElementById("ped-admin-category").value = "";
+  document.getElementById("ped-admin-route").value = "VO";
+  document.getElementById("ped-admin-dose").value = "";
+  document.getElementById("ped-admin-dose-max").value = "";
+  document.getElementById("ped-admin-dose-type").value = "";
+  document.getElementById("ped-admin-interval").value = "";
+  document.getElementById("ped-admin-notes").value = "";
+  document.getElementById("ped-admin-delete").style.display = "none";
+  document.getElementById("ped-presentations-admin").innerHTML = "";
+  addPedPresentationField();
+  updatePedMarkerPreview();
+}
+
+function editPedDrug(id) {
+  const drug = PEDIATRIC_DRUGS.find(d => d.id === id);
+  if (!drug) return;
+  document.getElementById("ped-admin-original-id").value = drug.id;
+  document.getElementById("ped-admin-name").value = drug.name || "";
+  document.getElementById("ped-admin-id").value = drug.id || "";
+  document.getElementById("ped-admin-category").value = drug.category || "";
+  document.getElementById("ped-admin-route").value = drug.route || "";
+  document.getElementById("ped-admin-dose").value = drug.dose_per_kg ?? "";
+  document.getElementById("ped-admin-dose-max").value = drug.dose_max ?? "";
+  document.getElementById("ped-admin-dose-type").value = drug.dose_type || "";
+  document.getElementById("ped-admin-interval").value = drug.interval || "";
+  document.getElementById("ped-admin-notes").value = drug.notes || "";
+  document.getElementById("ped-admin-delete").style.display = "inline-block";
+
+  document.getElementById("ped-presentations-admin").innerHTML = "";
+  (drug.presentations && drug.presentations.length ? drug.presentations : [{}])
+    .forEach(p => addPedPresentationField(p));
+  updatePedMarkerPreview();
+}
+
+function addPedPresentationField(p = {}) {
+  const wrap = document.getElementById("ped-presentations-admin");
+  const idx = wrap.querySelectorAll(".ped-presentation-row").length;
+  const div = document.createElement("div");
+  div.className = "ped-presentation-row";
+  div.innerHTML = `
+    <input type="text" class="ped-pres-label-input" placeholder="Nome. Ex: Gotas 200 mg/mL" value="${escapeHtml(p.label || "")}" />
+    <select class="ped-pres-kind" onchange="updatePedMarkerPreview()">
+      <option value="ml" ${p.concentration && !p.drop_mg ? "selected" : ""}>mL</option>
+      <option value="gotas" ${p.drop_mg ? "selected" : ""}>gotas</option>
+      <option value="comprimidos" ${p.fixed_mg ? "selected" : ""}>comprimido</option>
+      <option value="fixo" ${p.dose_fixed_label ? "selected" : ""}>texto fixo</option>
+    </select>
+    <input type="number" class="ped-pres-concentration" min="0" step="0.01" placeholder="mg/mL" value="${p.concentration ?? ""}" />
+    <input type="number" class="ped-pres-drop" min="0" step="0.01" placeholder="mg/gota" value="${p.drop_mg ?? ""}" />
+    <input type="number" class="ped-pres-fixed" min="0" step="0.01" placeholder="mg/comp" value="${p.fixed_mg ?? ""}" />
+    <input type="text" class="ped-pres-fixed-label" placeholder="ex: 2-4 jatos" value="${escapeHtml(p.dose_fixed_label || "")}" />
+    ${idx > 0 ? `<button type="button" class="btn-remove-variant" onclick="removePedPresentationField(this)">x</button>` : ""}
+  `;
+  wrap.appendChild(div);
+  updatePedMarkerPreview();
+}
+
+function removePedPresentationField(btn) {
+  btn.closest(".ped-presentation-row").remove();
+  updatePedMarkerPreview();
+}
+
+function collectPedPresentations() {
+  return [...document.querySelectorAll("#ped-presentations-admin .ped-presentation-row")]
+    .map(row => {
+      const kind = row.querySelector(".ped-pres-kind").value;
+      const base = { label: row.querySelector(".ped-pres-label-input").value.trim() };
+      if (!base.label) return null;
+      if (kind === "gotas") {
+        base.unit = "gotas";
+        base.concentration = parseLocaleNumber(row.querySelector(".ped-pres-concentration").value);
+        base.drop_mg = parseLocaleNumber(row.querySelector(".ped-pres-drop").value);
+      } else if (kind === "comprimidos") {
+        base.unit = "comprimidos";
+        base.fixed_mg = parseLocaleNumber(row.querySelector(".ped-pres-fixed").value);
+      } else if (kind === "fixo") {
+        base.unit = "jatos";
+        base.dose_fixed_label = row.querySelector(".ped-pres-fixed-label").value.trim();
+      } else {
+        base.unit = "mL";
+        base.concentration = parseLocaleNumber(row.querySelector(".ped-pres-concentration").value);
+      }
+      Object.keys(base).forEach(key => {
+        if (Number.isNaN(base[key]) || base[key] === "") delete base[key];
+      });
+      return base;
+    })
+    .filter(Boolean);
+}
+
+function getPedAdminDrugFromForm() {
+  const id = normalizePedDrugId(document.getElementById("ped-admin-id").value);
+  return {
+    id,
+    name: document.getElementById("ped-admin-name").value.trim(),
+    category: document.getElementById("ped-admin-category").value.trim(),
+    dose_per_kg: parseLocaleNumber(document.getElementById("ped-admin-dose").value) || null,
+    dose_max: parseLocaleNumber(document.getElementById("ped-admin-dose-max").value) || null,
+    interval: document.getElementById("ped-admin-interval").value.trim(),
+    max_daily: null,
+    weight_min: 1,
+    weight_max: 100,
+    presentations: collectPedPresentations(),
+    notes: document.getElementById("ped-admin-notes").value.trim(),
+    route: document.getElementById("ped-admin-route").value.trim(),
+    dose_type: document.getElementById("ped-admin-dose-type").value || undefined
+  };
+}
+
+function savePedDrug(e) {
+  e.preventDefault();
+  const originalId = document.getElementById("ped-admin-original-id").value;
+  const drug = getPedAdminDrugFromForm();
+  if (!drug.id || !drug.name) {
+    alert("Preencha nome e código do marcador.");
+    return;
+  }
+  if (!drug.dose_per_kg && !drug.presentations.some(p => p.dose_fixed_label)) {
+    alert("Informe a dose mg/kg ou uma apresentação com texto fixo.");
+    return;
+  }
+
+  const duplicate = PEDIATRIC_DRUGS.find(d => d.id === drug.id && d.id !== originalId);
+  if (duplicate) {
+    alert("Já existe um medicamento com esse código de marcador.");
+    return;
+  }
+
+  const index = PEDIATRIC_DRUGS.findIndex(d => d.id === originalId);
+  if (index >= 0) PEDIATRIC_DRUGS[index] = drug;
+  else PEDIATRIC_DRUGS.push(drug);
+
+  persistPedDrugs();
+  renderPedDrugAdmin(drug.id);
+  alert("Medicamento pediátrico salvo.");
+}
+
+function deletePedDrug() {
+  const id = document.getElementById("ped-admin-original-id").value;
+  if (!id || !confirm("Excluir este medicamento pediátrico?")) return;
+  const index = PEDIATRIC_DRUGS.findIndex(d => d.id === id);
+  if (index >= 0) PEDIATRIC_DRUGS.splice(index, 1);
+  persistPedDrugs();
+  newPedDrug();
+  renderPedDrugAdmin();
+}
+
+function updatePedMarkerPreview() {
+  const id = normalizePedDrugId(document.getElementById("ped-admin-id")?.value || "");
+  const el = document.getElementById("ped-marker-preview");
+  if (!el) return;
+  if (!id) {
+    el.innerHTML = `<code>{{medicamento_dose}}</code>`;
+    return;
+  }
+  const markers = [`{{${id}_dose}}`, `{{${id}_mg}}`, `{{${id}_intervalo}}`, `{{${id}_rota}}`];
+  collectPedPresentations().forEach(p => {
+    if (p.drop_mg) markers.push(`{{${id}_gotas}}`);
+    else if (p.fixed_mg) markers.push(`{{${id}_comprimidos}}`);
+    else if (p.concentration) markers.push(`{{${id}_ml}}`);
+    else if (p.dose_fixed_label) markers.push(`{{${id}_${p.unit}}}`);
+  });
+  el.innerHTML = [...new Set(markers)].map(m => `<code onclick="navigator.clipboard.writeText('${m}')">${m}</code>`).join("");
+}
+
 // ── Admin ─────────────────────────────────────────────────
 async function openAdmin() {
   document.getElementById("admin-modal").classList.add("open");
@@ -262,6 +499,7 @@ function switchTab(tabId, btn) {
   document.getElementById(tabId).classList.add("active");
   btn.classList.add("active");
   if (tabId === "tab-shortcuts") renderShortcutsList();
+  if (tabId === "tab-ped-drugs") renderPedDrugAdmin();
 }
 
 async function renderAdminList() {
@@ -477,8 +715,19 @@ function deleteShortcut() {
 window.addEventListener("load", async () => {
   showLoading();
   try {
+    loadPedDrugsFromStorage();
+    renderPedDrugOptions();
     await window.dbInit();
     addNewVariantField("Prescrição");
+    ["ped-admin-id", "ped-admin-name"].forEach(id => {
+      document.getElementById(id)?.addEventListener("input", () => {
+        if (id === "ped-admin-name" && !document.getElementById("ped-admin-id").value) {
+          document.getElementById("ped-admin-id").value = normalizePedDrugId(document.getElementById("ped-admin-name").value);
+        }
+        updatePedMarkerPreview();
+      });
+    });
+    document.getElementById("ped-presentations-admin")?.addEventListener("input", updatePedMarkerPreview);
   } finally { hideLoading(); }
 });
 
@@ -489,7 +738,9 @@ Object.assign(window, {
   addVariantField, removeVariant, addNewVariantField, removeNewVariant,
   closeShortcutIfBg, renderShortcutsList,
   openNewShortcut, openEditShortcut, closeShortcutModal, closeShortcutModalIfBg,
-  saveShortcut, deleteShortcut, updatePediatricPrescriptionContext
+  saveShortcut, deleteShortcut, updatePediatricPrescriptionContext,
+  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField,
+  removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview
 });
 
 // ══════════════════════════════════════════════════════════
@@ -510,14 +761,7 @@ function switchPedTab(tabId, btn) {
 }
 
 function initPedCalculator() {
-  const sel = document.getElementById("ped-drug");
-  if (sel.options.length > 1) return; // já populado
-  PEDIATRIC_DRUGS.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.id;
-    opt.textContent = `${d.name} — ${d.category}`;
-    sel.appendChild(opt);
-  });
+  renderPedDrugOptions();
 }
 
 function calculateDose() {
@@ -662,3 +906,11 @@ window.calculateDose     = calculateDose;
 window.copyPedResult     = copyPedResult;
 window.filterPedDiseases = filterPedDiseases;
 window.updatePediatricPrescriptionContext = updatePediatricPrescriptionContext;
+window.renderPedDrugAdmin = renderPedDrugAdmin;
+window.newPedDrug = newPedDrug;
+window.editPedDrug = editPedDrug;
+window.addPedPresentationField = addPedPresentationField;
+window.removePedPresentationField = removePedPresentationField;
+window.savePedDrug = savePedDrug;
+window.deletePedDrug = deletePedDrug;
+window.updatePedMarkerPreview = updatePedMarkerPreview;

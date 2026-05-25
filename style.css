@@ -417,6 +417,7 @@ html, body {
   box-shadow: var(--shadow);
   animation: modal-slide 0.3s ease;
 }
+.admin-modal-panel { max-width: 920px; }
 
 @keyframes modal-slide {
   from { transform: translateY(24px); opacity: 0; }
@@ -821,6 +822,161 @@ html, body {
   padding: 1px 6px;
   border-radius: 4px;
   color: var(--yellow);
+}
+
+/* ── Pediatria admin ─────────────────────────────────── */
+.ped-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.8fr) minmax(260px, 1.2fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.ped-admin-list-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.ped-admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.ped-drug-admin-list {
+  max-height: 520px;
+  overflow-y: auto;
+}
+
+.ped-drug-admin-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  padding: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+.ped-drug-admin-item:hover { background: var(--bg3); }
+.ped-drug-admin-item strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+.ped-drug-admin-item small {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #fbbf24;
+}
+.ped-drug-admin-item em {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.ped-admin-form {
+  padding: 0;
+}
+
+.field-help {
+  margin: -6px 0 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.form-grid-2,
+.form-grid-3 {
+  display: grid;
+  gap: 10px;
+}
+.form-grid-2 { grid-template-columns: 1fr 1fr; }
+.form-grid-3 { grid-template-columns: 1fr 1fr 1.2fr; }
+
+.ped-presentation-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.4fr) 105px repeat(4, minmax(70px, 1fr)) auto;
+  gap: 8px;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.ped-presentation-row input,
+.ped-presentation-row select {
+  width: 100%;
+  min-width: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 8px;
+  outline: none;
+}
+
+.ped-marker-preview {
+  background: rgba(251,191,36,0.06);
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin: 10px 0;
+}
+.ped-marker-preview span {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.ped-marker-preview div {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ped-marker-preview code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #fbbf24;
+  background: var(--bg);
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 6px;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .ped-admin-layout,
+  .form-grid-2,
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .ped-presentation-row {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* ── Insert Block button ──────────────────────────────── */

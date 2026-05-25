@@ -221,7 +221,7 @@
 
   <!-- ADMIN MODAL -->
   <div id="admin-modal" class="modal-overlay" onclick="closeAdminIfOutside(event)">
-    <div class="modal">
+    <div class="modal admin-modal-panel">
       <div class="modal-header">
         <h3>Gerenciar Prescrições</h3>
         <button class="modal-close" onclick="closeAdmin()">✕</button>
@@ -230,6 +230,7 @@
         <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver</button>
         <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
         <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
+        <button class="tab" onclick="switchTab('tab-ped-drugs', this)">Pediatria</button>
         <button class="tab" onclick="switchTab('tab-shortcuts', this)">/ Atalhos</button>
       </div>
 
@@ -296,6 +297,80 @@
         </div>
         <div class="admin-list" id="shortcuts-list"></div>
         <button class="btn-add-variant" style="margin:12px 20px;width:calc(100% - 40px)" onclick="openNewShortcut()">+ Novo Atalho</button>
+      </div>
+
+      <div id="tab-ped-drugs" class="tab-content">
+        <div class="ped-admin-layout">
+          <div class="ped-admin-list-panel">
+            <div class="ped-admin-head">
+              <span>Medicamentos</span>
+              <button type="button" class="btn-edit-item" onclick="newPedDrug()">+ Novo</button>
+            </div>
+            <div id="ped-drug-admin-list" class="ped-drug-admin-list"></div>
+          </div>
+
+          <form class="admin-form ped-admin-form" onsubmit="savePedDrug(event)">
+            <input type="hidden" id="ped-admin-original-id" />
+
+            <label>Nome do medicamento</label>
+            <input type="text" id="ped-admin-name" placeholder="ex: Cefalexina" required />
+
+            <label>Código do marcador</label>
+            <input type="text" id="ped-admin-id" placeholder="ex: cefalexina" required />
+            <p class="field-help">Use apenas letras, números e underline. Ex: cefalexina vira {{cefalexina_ml}}.</p>
+
+            <div class="form-grid-2">
+              <div>
+                <label>Categoria</label>
+                <input type="text" id="ped-admin-category" placeholder="Antibiótico" />
+              </div>
+              <div>
+                <label>Via</label>
+                <input type="text" id="ped-admin-route" placeholder="VO" />
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div>
+                <label>Dose mg/kg</label>
+                <input type="number" id="ped-admin-dose" min="0" step="0.01" placeholder="15" />
+              </div>
+              <div>
+                <label>Dose máxima</label>
+                <input type="number" id="ped-admin-dose-max" min="0" step="0.01" placeholder="1000" />
+              </div>
+              <div>
+                <label>Tipo</label>
+                <select id="ped-admin-dose-type">
+                  <option value="">Por dose</option>
+                  <option value="daily">Dose diária / dividir em 3</option>
+                </select>
+              </div>
+            </div>
+
+            <label>Intervalo</label>
+            <input type="text" id="ped-admin-interval" placeholder="a cada 6 horas" />
+
+            <label>Observações</label>
+            <textarea id="ped-admin-notes" rows="3" placeholder="Orientações, dose usual, cuidados..."></textarea>
+
+            <div class="ped-admin-head">
+              <span>Apresentações</span>
+              <button type="button" class="btn-edit-item" onclick="addPedPresentationField()">+ Adicionar</button>
+            </div>
+            <div id="ped-presentations-admin"></div>
+
+            <div class="ped-marker-preview">
+              <span>Marcadores deste medicamento</span>
+              <div id="ped-marker-preview"></div>
+            </div>
+
+            <div style="display:flex;gap:12px;margin-top:8px">
+              <button type="submit" class="btn-save">Salvar Medicamento</button>
+              <button type="button" class="btn-delete" id="ped-admin-delete" onclick="deletePedDrug()" style="display:none">Excluir</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
