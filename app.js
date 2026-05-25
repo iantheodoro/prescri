@@ -8,6 +8,7 @@ let currentVariantIndex = 0;
 let editingId = null;
 let editVariants = [];
 let newEditVariants = [];
+let pediatricPrescriptionContext = { weight: "", age: "" };
 
 function showLoading() { document.getElementById("loading").classList.add("show"); }
 function hideLoading() { document.getElementById("loading").classList.remove("show"); }
@@ -59,9 +60,12 @@ async function openPrescription(id) {
     if (!p) return;
     currentPrescription = p;
     currentVariantIndex = 0;
+    document.querySelector("#screen-prescription .btn-back")
+      .setAttribute("onclick", `goBack('${p.sector === "Pediatria" ? "screen-pediatria" : "screen-disease"}')`);
     document.getElementById("rx-sector-label").textContent = p.sector;
     document.getElementById("rx-disease-name").textContent = p.disease;
     document.getElementById("rx-date").textContent = new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" });
+    setupPediatricPrescriptionContext(p);
     renderVariantTabs();
     renderVariantContent(0);
     document.getElementById("btn-copy").classList.remove("copied");
@@ -92,7 +96,7 @@ function switchVariant(i, btn) {
 function renderVariantContent(i) {
   const p = currentPrescription;
   const v = p.variants ? p.variants[i] : { text: p.prescription || "" };
-  document.getElementById("rx-text").textContent = v.text || "";
+  document.getElementById("rx-text").textContent = renderPrescriptionText(v.text || "");
 }
 
 function copyPrescription() {
@@ -100,7 +104,7 @@ function copyPrescription() {
   const v = currentPrescription.variants
     ? currentPrescription.variants[currentVariantIndex]
     : { text: currentPrescription.prescription || "" };
-  navigator.clipboard.writeText(v.text || "").then(() => {
+  navigator.clipboard.writeText(renderPrescriptionText(v.text || "")).then(() => {
     document.getElementById("btn-copy").classList.add("copied");
     document.getElementById("copy-feedback").classList.add("show");
     setTimeout(() => {
@@ -108,6 +112,140 @@ function copyPrescription() {
       document.getElementById("copy-feedback").classList.remove("show");
     }, 2500);
   });
+}
+
+function isPediatricPrescription(p = currentPrescription) {
+  return p && p.sector === "Pediatria";
+}
+
+function parseLocaleNumber(value) {
+  if (value === null || value === undefined) return NaN;
+  return parseFloat(String(value).replace(",", "."));
+}
+
+function formatPedNumber(value, digits = 1) {
+  if (!Number.isFinite(value)) return "";
+  return Number(value.toFixed(digits)).toLocaleString("pt-BR", { maximumFractionDigits: digits });
+}
+
+function setupPediatricPrescriptionContext(p) {
+  const panel = document.getElementById("rx-ped-context");
+  if (!panel) return;
+
+  if (!isPediatricPrescription(p)) {
+    panel.style.display = "none";
+    return;
+  }
+
+  const calcWeight = document.getElementById("ped-weight")?.value || "";
+  const calcAge = document.getElementById("ped-age")?.value || "";
+  pediatricPrescriptionContext.weight = pediatricPrescriptionContext.weight || calcWeight;
+  pediatricPrescriptionContext.age = pediatricPrescriptionContext.age || calcAge;
+
+  document.getElementById("rx-ped-weight").value = pediatricPrescriptionContext.weight;
+  document.getElementById("rx-ped-age").value = pediatricPrescriptionContext.age;
+  panel.style.display = "flex";
+}
+
+function updatePediatricPrescriptionContext() {
+  pediatricPrescriptionContext.weight = document.getElementById("rx-ped-weight")?.value || "";
+  pediatricPrescriptionContext.age = document.getElementById("rx-ped-age")?.value || "";
+
+  const calcWeight = document.getElementById("ped-weight");
+  const calcAge = document.getElementById("ped-age");
+  if (calcWeight) calcWeight.value = pediatricPrescriptionContext.weight;
+  if (calcAge) calcAge.value = pediatricPrescriptionContext.age;
+
+  if (currentPrescription) renderVariantContent(currentVariantIndex);
+}
+
+function renderPrescriptionText(text) {
+  if (!isPediatricPrescription()) return text;
+  const markers = buildPediatricMarkerMap();
+  return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => {
+    const value = markers[key.toLowerCase()];
+    return value === undefined || value === "" ? match : value;
+  });
+}
+
+function getPediatricCalculation(drug, weight, age) {
+  if (!drug) return null;
+
+  let dosePerDose;
+  let dailyDose = null;
+  let label = "";
+
+  if (drug.dose_by_age) {
+    const ageBucket = Number.isFinite(age)
+      ? age
+      : Number.isFinite(weight) ? (weight < 15 ? 5 : weight < 30 ? 8 : 14) : NaN;
+    const bucket = drug.dose_by_age.find(b => ageBucket >= b.age_min && ageBucket < b.age_max)
+      || drug.dose_by_age[drug.dose_by_age.length - 1];
+    dosePerDose = bucket.dose;
+    label = `${formatPedNumber(dosePerDose)} mg (dose fixa por faixa etária)`;
+  } else if (Number.isFinite(weight) && weight > 0 && drug.dose_type === "daily") {
+    dailyDose = Math.min(drug.dose_per_kg * weight, drug.dose_max);
+    dosePerDose = Math.round((dailyDose / 3) * 10) / 10;
+    label = `${formatPedNumber(dailyDose)} mg/dia -> ${formatPedNumber(dosePerDose)} mg por dose`;
+  } else if (Number.isFinite(weight) && weight > 0 && drug.dose_per_kg) {
+    dosePerDose = Math.min(drug.dose_per_kg * weight, drug.dose_max);
+    dosePerDose = Math.round(dosePerDose * 10) / 10;
+    label = `${formatPedNumber(dosePerDose)} mg`;
+  } else {
+    return null;
+  }
+
+  return { dosePerDose, dailyDose, label };
+}
+
+function buildPediatricMarkerMap() {
+  const weight = parseLocaleNumber(pediatricPrescriptionContext.weight);
+  const age = parseLocaleNumber(pediatricPrescriptionContext.age);
+  const map = {
+    peso: Number.isFinite(weight) ? `${formatPedNumber(weight)} kg` : "",
+    peso_kg: Number.isFinite(weight) ? formatPedNumber(weight) : "",
+    idade: Number.isFinite(age) ? `${formatPedNumber(age)} anos` : "",
+    idade_anos: Number.isFinite(age) ? formatPedNumber(age) : ""
+  };
+
+  PEDIATRIC_DRUGS.forEach(drug => {
+    const calc = getPediatricCalculation(drug, weight, age);
+    map[`${drug.id}_nome`] = drug.name;
+    map[`${drug.id}_rota`] = drug.route;
+    map[`${drug.id}_intervalo`] = drug.interval;
+    map[`${drug.id}_dose`] = calc ? calc.label : "";
+    map[`${drug.id}_mg`] = calc ? formatPedNumber(calc.dosePerDose) : "";
+
+    if (!calc) return;
+
+    drug.presentations.forEach(p => {
+      if (p.dose_fixed_label) {
+        map[`${drug.id}_${p.unit}`] = p.dose_fixed_label;
+        return;
+      }
+      if (p.drop_mg) {
+        const gotas = Math.round(calc.dosePerDose / p.drop_mg);
+        map[`${drug.id}_gotas`] = `${gotas} gotas`;
+        map[`${drug.id}_gotas_num`] = String(gotas);
+        return;
+      }
+      if (p.fixed_mg) {
+        const comprimidos = calc.dosePerDose / p.fixed_mg;
+        const value = comprimidos >= 1
+          ? `${comprimidos % 1 === 0 ? comprimidos : comprimidos.toFixed(1)} comprimido(s)`
+          : `${comprimidos.toFixed(2)} comprimido`;
+        if (!map[`${drug.id}_comprimidos`]) map[`${drug.id}_comprimidos`] = value;
+        return;
+      }
+      if (p.concentration) {
+        const vol = Math.round((calc.dosePerDose / p.concentration) * 10) / 10;
+        if (!map[`${drug.id}_ml`]) map[`${drug.id}_ml`] = `${formatPedNumber(vol)} mL`;
+        if (!map[`${drug.id}_ml_num`]) map[`${drug.id}_ml_num`] = formatPedNumber(vol);
+      }
+    });
+  });
+
+  return map;
 }
 
 // ── Admin ─────────────────────────────────────────────────
@@ -351,7 +489,7 @@ Object.assign(window, {
   addVariantField, removeVariant, addNewVariantField, removeNewVariant,
   closeShortcutIfBg, renderShortcutsList,
   openNewShortcut, openEditShortcut, closeShortcutModal, closeShortcutModalIfBg,
-  saveShortcut, deleteShortcut
+  saveShortcut, deleteShortcut, updatePediatricPrescriptionContext
 });
 
 // ══════════════════════════════════════════════════════════
@@ -383,10 +521,22 @@ function initPedCalculator() {
 }
 
 function calculateDose() {
-  const weight = parseFloat(document.getElementById("ped-weight").value);
+  const weightText = document.getElementById("ped-weight").value;
+  const ageText = document.getElementById("ped-age")?.value || "";
+  const weight = parseLocaleNumber(weightText);
+  const age = parseLocaleNumber(ageText);
   const drugId = document.getElementById("ped-drug").value;
   const result = document.getElementById("ped-result");
   const placeholder = document.getElementById("ped-placeholder");
+
+  pediatricPrescriptionContext.weight = weightText;
+  pediatricPrescriptionContext.age = ageText;
+
+  const rxWeight = document.getElementById("rx-ped-weight");
+  const rxAge = document.getElementById("rx-ped-age");
+  if (rxWeight && isPediatricPrescription()) rxWeight.value = weightText;
+  if (rxAge && isPediatricPrescription()) rxAge.value = ageText;
+  if (currentPrescription && isPediatricPrescription()) renderVariantContent(currentVariantIndex);
 
   if (!weight || !drugId || weight < 1 || weight > 150) {
     result.style.display = "none";
@@ -397,26 +547,9 @@ function calculateDose() {
   const drug = PEDIATRIC_DRUGS.find(d => d.id === drugId);
   if (!drug) return;
 
-  // Calcular dose
-  let dosePerDose, label;
-  if (drug.dose_by_age) {
-    // dose fixa por faixa — usa peso como proxy (sem idade explícita)
-    // estimativa: < 15 kg = 2–6 anos, 15–30 kg = 6–12 anos
-    let ageBucket = weight < 15 ? 5 : weight < 30 ? 8 : 14;
-    const bucket = drug.dose_by_age.find(b => ageBucket >= b.age_min && ageBucket < b.age_max)
-                || drug.dose_by_age[drug.dose_by_age.length - 1];
-    dosePerDose = bucket.dose;
-    label = `${dosePerDose} mg (dose fixa por faixa etária)`;
-  } else if (drug.dose_type === "daily") {
-    // dose diária total
-    const daily = Math.min(drug.dose_per_kg * weight, drug.dose_max);
-    dosePerDose = Math.round((daily / 3) * 10) / 10; // dividir em 3
-    label = `${Math.round(daily * 10) / 10} mg/dia → ${dosePerDose} mg por dose`;
-  } else {
-    dosePerDose = Math.min(drug.dose_per_kg * weight, drug.dose_max);
-    dosePerDose = Math.round(dosePerDose * 10) / 10;
-    label = `${dosePerDose} mg`;
-  }
+  const calc = getPediatricCalculation(drug, weight, age);
+  if (!calc) return;
+  const { dosePerDose, label } = calc;
 
   // Preencher resultado
   document.getElementById("ped-result-drug").textContent = drug.name;
@@ -469,6 +602,7 @@ function calculateDose() {
 
 function copyPedResult() {
   const weight = document.getElementById("ped-weight").value;
+  const age = document.getElementById("ped-age")?.value || "";
   const drugId = document.getElementById("ped-drug").value;
   const drug = PEDIATRIC_DRUGS.find(d => d.id === drugId);
   if (!drug) return;
@@ -481,7 +615,7 @@ function copyPedResult() {
     return `  • ${name}: ${vol}`;
   }).join("\n");
 
-  const text = `${drug.name} — Peso: ${weight} kg
+  const text = `${drug.name} — Peso: ${weight} kg${age ? ` — Idade: ${age} anos` : ""}
 Dose: ${doseCalc}
 Intervalo: ${interval}
 Apresentações:
@@ -527,3 +661,4 @@ window.switchPedTab      = switchPedTab;
 window.calculateDose     = calculateDose;
 window.copyPedResult     = copyPedResult;
 window.filterPedDiseases = filterPedDiseases;
+window.updatePediatricPrescriptionContext = updatePediatricPrescriptionContext;

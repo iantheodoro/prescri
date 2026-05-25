@@ -632,6 +632,60 @@ html, body {
   color: #050a07;
 }
 
+.rx-ped-context {
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-bottom: 16px;
+}
+
+.rx-ped-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 120px;
+}
+
+.rx-ped-field label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.rx-ped-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+}
+
+.rx-ped-input-wrap:focus-within { border-color: #fbbf24; }
+
+.rx-ped-input-wrap input {
+  width: 64px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 15px;
+}
+
+.rx-ped-input-wrap span {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* ── Variant count badge ──────────────────────────────── */
 .variant-count {
   font-family: var(--font-mono);
