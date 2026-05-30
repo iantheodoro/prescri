@@ -2,7 +2,7 @@
 //  sw.js — Service Worker — PrescriçõesMed
 // ============================================================
 
-const CACHE_NAME = "rxmed-v1";
+const CACHE_NAME = "rxmed-v3";
 
 // Arquivos estáticos que ficam disponíveis offline
 const STATIC_ASSETS = [
