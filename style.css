@@ -1419,6 +1419,159 @@ html, body {
   line-height: 1.6;
 }
 
+/* ── Sedação contínua ─────────────────────────────────── */
+.sed-card {
+  max-width: 760px;
+}
+
+.sed-infusion-card {
+  width: 100%;
+}
+
+.sed-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.sed-targets span,
+.sed-targets strong {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 8px;
+}
+
+.sed-targets strong {
+  color: #38bdf8;
+  border-color: rgba(56,189,248,0.35);
+  background: rgba(56,189,248,0.08);
+}
+
+.sed-dilution {
+  display: grid;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.sed-dilution span {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.sed-dilution strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.sed-dilution em {
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.sed-calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.sed-calc-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.sed-calc-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.sed-calc-row input {
+  min-width: 0;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 9px 10px;
+  outline: none;
+}
+
+.sed-calc-row input:focus {
+  border-color: #38bdf8;
+}
+
+.sed-calc-row span {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.sed-calc-row strong {
+  color: #38bdf8;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  min-width: 40px;
+  text-align: right;
+}
+
+.sed-range-badge {
+  display: none;
+  margin-top: 10px;
+  border-radius: 7px;
+  padding: 7px 9px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sed-range-badge.below,
+.sed-range-badge.light,
+.sed-range-badge.deep,
+.sed-range-badge.above {
+  display: block;
+}
+
+.sed-range-badge.below {
+  color: var(--text-muted);
+  background: rgba(148,163,173,0.08);
+  border: 1px solid rgba(148,163,173,0.22);
+}
+
+.sed-range-badge.light {
+  color: #86efac;
+  background: rgba(52,211,153,0.08);
+  border: 1px solid rgba(52,211,153,0.25);
+}
+
+.sed-range-badge.deep {
+  color: #fcd34d;
+  background: rgba(251,191,36,0.08);
+  border: 1px solid rgba(251,191,36,0.25);
+}
+
+.sed-range-badge.above {
+  color: #fca5a5;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25);
+}
+
 .btn-copy-ped {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; padding: 14px;

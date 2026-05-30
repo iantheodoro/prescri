@@ -760,8 +760,136 @@ Object.assign(window, {
   saveShortcut, deleteShortcut, updatePediatricPrescriptionContext,
   renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField,
   removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
-  openIntubacao, calculateIntubacao
+  openIntubacao, calculateIntubacao, openSedacao, calculateSedacao
 });
+
+// ══════════════════════════════════════════════════════════
+//  SEDAÇÃO CONTÍNUA
+// ══════════════════════════════════════════════════════════
+
+const SEDATION_INFUSIONS = [
+  {
+    id: "propofol",
+    name: "Propofol",
+    klass: "Sedativo",
+    concentration: 10,
+    concentrationLabel: "10 mg/mL",
+    dilution: "Frasco original 200 mg/20 mL - sem diluição",
+    doseUnit: "mg/kg/h",
+    flowUnit: "mL/h",
+    lightRange: "Leve: 0,3-1 mg/kg/h",
+    deepRange: "Profunda: 1-4 mg/kg/h",
+    recommendedLimit: "Limite recomendado: 4 mg/kg/h"
+  }
+];
+
+function openSedacao() {
+  showScreen("screen-sedacao");
+  renderSedacao();
+}
+
+function formatSedNumber(value, digits = 2) {
+  if (!Number.isFinite(value)) return "—";
+  return Number(value.toFixed(digits)).toLocaleString("pt-BR", { maximumFractionDigits: digits });
+}
+
+function getSedWeight() {
+  const weight = parseLocaleNumber(document.getElementById("sed-weight")?.value);
+  return Number.isFinite(weight) && weight > 0 ? weight : 0;
+}
+
+function getSedRangeClass(dose) {
+  if (!Number.isFinite(dose) || dose <= 0) return "";
+  if (dose < 0.3) return "below";
+  if (dose <= 1) return "light";
+  if (dose <= 4) return "deep";
+  return "above";
+}
+
+function getSedRangeLabel(dose) {
+  const cls = getSedRangeClass(dose);
+  if (cls === "below") return "Abaixo da faixa leve descrita";
+  if (cls === "light") return "Faixa leve";
+  if (cls === "deep") return "Faixa profunda";
+  if (cls === "above") return "Acima do limite recomendado";
+  return "";
+}
+
+function renderSedacao() {
+  const target = document.getElementById("sed-results");
+  if (!target) return;
+
+  target.innerHTML = SEDATION_INFUSIONS.map(drug => `
+    <article class="iot-drug-card sed-infusion-card" style="--iot-accent:#38bdf8">
+      <div class="iot-drug-name">${drug.name}</div>
+      <div class="iot-drug-class">${drug.klass}</div>
+      <div class="sed-targets">
+        <span>${drug.lightRange}</span>
+        <span>${drug.deepRange}</span>
+        <strong>${drug.recommendedLimit}</strong>
+      </div>
+
+      <div class="sed-dilution">
+        <span>Apresentação</span>
+        <strong>${drug.dilution}</strong>
+        <em>${drug.concentrationLabel}</em>
+      </div>
+
+      <div class="sed-calc-grid">
+        <div class="sed-calc-panel">
+          <div class="ped-pres-label">Vazão -> Dose</div>
+          <div class="sed-calc-row">
+            <input type="number" id="${drug.id}-flow" min="0" step="0.1" placeholder="mL/h" oninput="calculateSedacao()" />
+            <span>${drug.flowUnit}</span>
+            <strong id="${drug.id}-dose-result">—</strong>
+            <span>${drug.doseUnit}</span>
+          </div>
+          <div class="sed-range-badge" id="${drug.id}-range"></div>
+        </div>
+
+        <div class="sed-calc-panel">
+          <div class="ped-pres-label">Dose -> Vazão</div>
+          <div class="sed-calc-row">
+            <input type="number" id="${drug.id}-dose" min="0" step="0.1" placeholder="mg/kg/h" oninput="calculateSedacao()" />
+            <span>${drug.doseUnit}</span>
+            <strong id="${drug.id}-flow-result">—</strong>
+            <span>${drug.flowUnit}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  `).join("");
+
+  calculateSedacao();
+}
+
+function calculateSedacao() {
+  const weight = getSedWeight();
+  SEDATION_INFUSIONS.forEach(drug => {
+    const flowInput = document.getElementById(`${drug.id}-flow`);
+    const doseInput = document.getElementById(`${drug.id}-dose`);
+    const doseResult = document.getElementById(`${drug.id}-dose-result`);
+    const flowResult = document.getElementById(`${drug.id}-flow-result`);
+    const range = document.getElementById(`${drug.id}-range`);
+    if (!flowInput || !doseInput || !doseResult || !flowResult || !range) return;
+
+    const flow = parseLocaleNumber(flowInput.value);
+    const desiredDose = parseLocaleNumber(doseInput.value);
+    const calculatedDose = weight && Number.isFinite(flow) && flow > 0
+      ? (flow * drug.concentration) / weight
+      : NaN;
+    const calculatedFlow = weight && Number.isFinite(desiredDose) && desiredDose > 0
+      ? (desiredDose * weight) / drug.concentration
+      : NaN;
+
+    doseResult.textContent = formatSedNumber(calculatedDose, 2);
+    flowResult.textContent = formatSedNumber(calculatedFlow, 1);
+
+    const label = getSedRangeLabel(calculatedDose);
+    range.textContent = label;
+    range.className = `sed-range-badge ${getSedRangeClass(calculatedDose)}`;
+  });
+}
 
 // ══════════════════════════════════════════════════════════
 //  INTUBAÇÃO
@@ -1100,3 +1228,5 @@ window.deletePedDrug = deletePedDrug;
 window.updatePedMarkerPreview = updatePedMarkerPreview;
 window.openIntubacao = openIntubacao;
 window.calculateIntubacao = calculateIntubacao;
+window.openSedacao = openSedacao;
+window.calculateSedacao = calculateSedacao;

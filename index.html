@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260530-2" />
+  <link rel="stylesheet" href="style.css?v=20260530-3" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
@@ -59,6 +59,11 @@
           <div class="sector-icon">🫁</div>
           <div class="sector-name">Intubação</div>
           <div class="sector-desc">Doses para IOT por peso</div>
+        </button>
+        <button class="sector-card sector-card-special" onclick="openSedacao()">
+          <div class="sector-icon">💧</div>
+          <div class="sector-name">Sedação contínua</div>
+          <div class="sector-desc">Infusão bidirecional por peso</div>
         </button>
       </div>
     </div>
@@ -238,6 +243,36 @@
       </div>
 
       <div id="iot-drug-results"></div>
+    </div>
+  </div>
+
+  <!-- SEDAÇÃO CONTÍNUA SCREEN -->
+  <div id="screen-sedacao" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" style="background:rgba(56,189,248,0.12);border-color:#38bdf8;color:#38bdf8">💧 Sedação contínua</div>
+    </div>
+
+    <div class="iot-content">
+      <div class="rx-header">
+        <span class="rx-tag">CALCULADORA</span>
+        <h2 class="rx-title">Infusão de Sedação</h2>
+      </div>
+
+      <div class="iot-weight-card">
+        <label class="ped-label">Peso do paciente</label>
+        <div class="ped-weight-row">
+          <input type="number" id="sed-weight" min="1" max="300" step="1" value="70" oninput="calculateSedacao()" />
+          <span class="ped-weight-unit">kg</span>
+        </div>
+      </div>
+
+      <div class="iot-warning">
+        Cálculo bidirecional: informe a vazão para obter dose, ou informe a dose desejada para obter vazão. Ferramenta auxiliar.
+      </div>
+
+      <div id="sed-results" class="sed-card"></div>
     </div>
   </div>
 
@@ -429,9 +464,9 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260530-2"></script>
-  <script src="pediatria.js?v=20260530-2"></script>
-  <script src="db.js?v=20260530-2"></script>
-  <script src="app.js?v=20260530-2"></script>
+  <script src="shortcuts.js?v=20260530-3"></script>
+  <script src="pediatria.js?v=20260530-3"></script>
+  <script src="db.js?v=20260530-3"></script>
+  <script src="app.js?v=20260530-3"></script>
 </body>
 </html>
