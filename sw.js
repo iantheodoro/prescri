@@ -6,14 +6,13 @@ const CACHE_NAME = "rxmed-v1";
 
 // Arquivos estáticos que ficam disponíveis offline
 const STATIC_ASSETS = [
-  "/index.html",
-  "/style.css",
-  "/app.js",
-  "/db.js",
-  "/pediatria.js",
-  "/shortcuts.js",
-  "/manifest.json",
-  // Fontes do Google (serão cacheadas na primeira visita)
+  "/prescri/index.html",
+  "/prescri/style.css",
+  "/prescri/app.js",
+  "/prescri/db.js",
+  "/prescri/pediatria.js",
+  "/prescri/shortcuts.js",
+  "/prescri/manifest.json",
   "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap"
 ];
 
@@ -80,7 +79,7 @@ self.addEventListener("fetch", event => {
         return response;
       }).catch(() => {
         // Fallback para o index.html se offline e asset não cacheado
-        return caches.match("/index.html");
+        return caches.match("/prescri/index.html");
       });
     })
   );
