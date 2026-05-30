@@ -1269,6 +1269,156 @@ html, body {
   font-style: italic;
 }
 
+/* ── Intubação ───────────────────────────────────────── */
+.iot-content {
+  position: relative;
+  z-index: 2;
+  padding: 20px 24px 80px;
+  max-width: 980px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.iot-weight-card,
+.iot-warning {
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+
+.iot-weight-card {
+  max-width: 320px;
+}
+
+.iot-warning {
+  color: #fde68a;
+  border-color: rgba(251,191,36,0.35);
+  background: rgba(251,191,36,0.07);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.iot-section {
+  margin-top: 24px;
+}
+
+.iot-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.iot-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.iot-line {
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.iot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.iot-drug-card {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 17px 18px;
+  box-shadow: var(--shadow);
+}
+
+.iot-drug-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--iot-accent);
+}
+
+.iot-drug-name {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.iot-drug-class {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+
+.iot-dose-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.iot-dose-row:first-of-type {
+  border-top: none;
+}
+
+.iot-dose-label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.iot-dose-value {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.iot-dose-unit {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  min-width: 34px;
+}
+
+.iot-dose-ref {
+  grid-column: 1 / -1;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  margin-top: -4px;
+}
+
+.iot-drug-note {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .btn-copy-ped {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; padding: 14px;

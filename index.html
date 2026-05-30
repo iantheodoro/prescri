@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260525-6" />
+  <link rel="stylesheet" href="style.css?v=20260530-2" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
@@ -50,6 +50,15 @@
           <div class="sector-icon">🤰</div>
           <div class="sector-name">GO</div>
           <div class="sector-desc">Ginecologia e Obstetrícia</div>
+        </button>
+      </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Ferramentas Clínicas</div>
+      <div class="sector-grid sector-grid-special">
+        <button class="sector-card sector-card-special" onclick="openIntubacao()">
+          <div class="sector-icon">🫁</div>
+          <div class="sector-name">Intubação</div>
+          <div class="sector-desc">Doses para IOT por peso</div>
         </button>
       </div>
     </div>
@@ -199,6 +208,36 @@
         </div>
         <div class="disease-list" id="ped-disease-list"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- INTUBAÇÃO SCREEN -->
+  <div id="screen-intubacao" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" style="background:rgba(248,113,113,0.12);border-color:#f87171;color:#f87171">🫁 Intubação</div>
+    </div>
+
+    <div class="iot-content">
+      <div class="rx-header">
+        <span class="rx-tag">CALCULADORA</span>
+        <h2 class="rx-title">Intubação Orotraqueal</h2>
+      </div>
+
+      <div class="iot-weight-card">
+        <label class="ped-label">Peso do paciente</label>
+        <div class="ped-weight-row">
+          <input type="number" id="iot-weight" min="25" max="250" step="1" value="70" oninput="calculateIntubacao()" />
+          <span class="ped-weight-unit">kg</span>
+        </div>
+      </div>
+
+      <div class="iot-warning">
+        Ferramenta auxiliar. Não substitui julgamento clínico, contexto do paciente, protocolos locais ou checagem independente.
+      </div>
+
+      <div id="iot-drug-results"></div>
     </div>
   </div>
 
@@ -390,9 +429,9 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260525-6"></script>
-  <script src="pediatria.js?v=20260525-6"></script>
-  <script src="db.js?v=20260525-6"></script>
-  <script src="app.js?v=20260525-6"></script>
+  <script src="shortcuts.js?v=20260530-2"></script>
+  <script src="pediatria.js?v=20260530-2"></script>
+  <script src="db.js?v=20260530-2"></script>
+  <script src="app.js?v=20260530-2"></script>
 </body>
 </html>

@@ -759,8 +759,161 @@ Object.assign(window, {
   openNewShortcut, openEditShortcut, closeShortcutModal, closeShortcutModalIfBg,
   saveShortcut, deleteShortcut, updatePediatricPrescriptionContext,
   renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField,
-  removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview
+  removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
+  openIntubacao, calculateIntubacao
 });
+
+// ══════════════════════════════════════════════════════════
+//  INTUBAÇÃO
+// ══════════════════════════════════════════════════════════
+
+const INTUBATION_DRUG_GROUPS = [
+  {
+    category: "Premedicação",
+    color: "#34d399",
+    drugs: [
+      {
+        name: "Fentanil",
+        klass: "Premedicação / Opioide",
+        doses: [
+          { label: "Dose mín.", value: 1, unit: "mcg", reference: "1 mcg/kg", precision: 0 },
+          { label: "Dose máx.", value: 5, unit: "mcg", reference: "5 mcg/kg", precision: 0 }
+        ],
+        note: "Apresentação: 50 mcg/mL - ampolas com 2, 5 e 10 mL. Não fazer para todos os pacientes; geralmente indicado objetivando bloqueio simpático."
+      },
+      {
+        name: "Lidocaína",
+        klass: "Premedicação",
+        doses: [
+          { label: "Dose", value: 1.5, unit: "mg", reference: "1,5 mg/kg", precision: 0 }
+        ],
+        note: "Apresentação: 1 e 2% (10 e 20 mg/mL) - ampolas com 5 e 20 mL. Medicação de exceção; não recomendada rotineiramente."
+      }
+    ]
+  },
+  {
+    category: "Indução",
+    color: "#fb7185",
+    drugs: [
+      {
+        name: "Etomidato",
+        klass: "Indução",
+        doses: [
+          { label: "Dose", value: 0.3, unit: "mg", reference: "0,3 mg/kg", precision: 0 }
+        ],
+        note: "Apresentação: 2 mg/mL - ampola com 10 mL. Escolha segura para a maioria dos pacientes."
+      },
+      {
+        name: "Propofol",
+        klass: "Indução",
+        doses: [
+          { label: "Dose mín.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 },
+          { label: "Dose máx.", value: 2.5, unit: "mg", reference: "2,5 mg/kg", precision: 0 }
+        ],
+        note: "Apresentação: 10 mg/mL - ampolas com 10, 20 e 50 mL. Mais hipotensor que o etomidato; em TCE pode reduzir PIC."
+      },
+      {
+        name: "Cetamina",
+        klass: "Indução / Dissociativo",
+        doses: [
+          { label: "Dose mín.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 },
+          { label: "Dose máx.", value: 4, unit: "mg", reference: "4 mg/kg", precision: 0 }
+        ],
+        note: "Apresentação: 50 mg/mL - ampolas com 2 e 10 mL. Indicada em broncoespasmo e choque. Cuidado em HAS grave e HIC."
+      },
+      {
+        name: "Midazolam",
+        klass: "Indução / Benzodiazepínico",
+        doses: [
+          { label: "Dose mín.", value: 0.1, unit: "mg", reference: "0,1 mg/kg", precision: 1 },
+          { label: "Dose máx.", value: 0.3, unit: "mg", reference: "0,3 mg/kg", precision: 1 }
+        ],
+        note: "Apresentação: 1 mg/mL; ampolas de 5, 50 e 100 mL. Também 5 mg/mL, ampolas de 3 e 10 mL. Mais hipotensor e com desmame mais difícil. Reversível com flumazenil."
+      }
+    ]
+  },
+  {
+    category: "Bloqueio Neuromuscular",
+    color: "#fbbf24",
+    drugs: [
+      {
+        name: "Succinilcolina",
+        klass: "Bloqueio neuromuscular / Despolarizante",
+        doses: [
+          { label: "Dose mín.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 },
+          { label: "Dose máx.", value: 1.5, unit: "mg", reference: "1,5 mg/kg", precision: 0 }
+        ],
+        note: "Apresentação: ampola com 100 mg e 10 mL de diluente. Início aproximado 45 s, duração aproximada 10 min. Contraindicada em hiperpotassemia, grandes queimados, miopatias e história de hipertermia maligna. Sem antídoto."
+      },
+      {
+        name: "Rocurônio",
+        klass: "Bloqueio neuromuscular / Não despolarizante",
+        doses: [
+          { label: "Dose mín.", value: 0.6, unit: "mg", reference: "0,6 mg/kg", precision: 0 },
+          { label: "Dose máx.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 }
+        ],
+        note: "Apresentação: 10 mg/mL em ampolas de 5 mL. Alternativa à succinilcolina quando contraindicada. Reversível com sugamadex (16 mg/kg)."
+      }
+    ]
+  }
+];
+
+function openIntubacao() {
+  showScreen("screen-intubacao");
+  calculateIntubacao();
+}
+
+function formatIotDose(value, precision) {
+  const rounded = precision > 0 ? Number(value.toFixed(precision)) : Math.round(value);
+  return rounded.toLocaleString("pt-BR", { maximumFractionDigits: precision });
+}
+
+function renderIotDose(dose, weight) {
+  return `
+    <div class="iot-dose-row">
+      <span class="iot-dose-label">${dose.label}</span>
+      <span class="iot-dose-value">${formatIotDose(weight * dose.value, dose.precision)}</span>
+      <span class="iot-dose-unit">${dose.unit}</span>
+      <span class="iot-dose-ref">Dose de referência: ${dose.reference}</span>
+    </div>
+  `;
+}
+
+function renderIotDrug(drug, color, weight) {
+  return `
+    <article class="iot-drug-card" style="--iot-accent:${color}">
+      <div class="iot-drug-name">${drug.name}</div>
+      <div class="iot-drug-class">${drug.klass}</div>
+      ${drug.doses.map(dose => renderIotDose(dose, weight)).join("")}
+      <div class="iot-drug-note">${drug.note}</div>
+    </article>
+  `;
+}
+
+function calculateIntubacao() {
+  const input = document.getElementById("iot-weight");
+  const target = document.getElementById("iot-drug-results");
+  if (!input || !target) return;
+
+  const weight = parseLocaleNumber(input.value);
+  if (!Number.isFinite(weight) || weight <= 0) {
+    target.innerHTML = `<div class="empty-state">Informe um peso válido para calcular.</div>`;
+    return;
+  }
+
+  target.innerHTML = INTUBATION_DRUG_GROUPS.map(group => `
+    <section class="iot-section">
+      <div class="iot-section-head">
+        <span class="iot-dot" style="background:${group.color}"></span>
+        <span>${group.category}</span>
+        <span class="iot-line"></span>
+      </div>
+      <div class="iot-grid">
+        ${group.drugs.map(drug => renderIotDrug(drug, group.color, weight)).join("")}
+      </div>
+    </section>
+  `).join("");
+}
 
 // ══════════════════════════════════════════════════════════
 //  PEDIATRIA
@@ -945,3 +1098,5 @@ window.removePedPresentationField = removePedPresentationField;
 window.savePedDrug = savePedDrug;
 window.deletePedDrug = deletePedDrug;
 window.updatePedMarkerPreview = updatePedMarkerPreview;
+window.openIntubacao = openIntubacao;
+window.calculateIntubacao = calculateIntubacao;
