@@ -330,6 +330,25 @@ INDICAÇÕES MÉDICAS:
   }
 ];
 
+// ============================================================
+//  CAMADA OFFLINE — localStorage como fallback do Firestore
+// ============================================================
+
+const LOCAL_CACHE_KEY = "rxmed_prescricoes_cache";
+
+function localCacheSave(docs) {
+  try { localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(docs)); } catch(e) {}
+}
+
+function localCacheGet() {
+  try {
+    const raw = localStorage.getItem(LOCAL_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function isOffline() { return !navigator.onLine; }
+
 async function dbInit() {
   try {
     const snap = await db.collection(COL).limit(1).get();
@@ -338,25 +357,60 @@ async function dbInit() {
         await db.collection(COL).add(item);
       }
     }
+    // Salva cache local após inicializar com sucesso
+    const all = await dbGetAll();
+    localCacheSave(all);
   } catch(e) {
     console.error("Erro no dbInit:", e);
-    alert("Erro ao conectar ao banco de dados. Verifique as regras do Firestore.");
+    // Não mostra alert — pode estar offline com cache disponível
   }
 }
 
 async function dbGetAll() {
-  const snap = await db.collection(COL).get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (isOffline()) {
+    const cached = localCacheGet();
+    if (cached) return cached;
+  }
+  try {
+    const snap = await db.collection(COL).get();
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    localCacheSave(docs);
+    return docs;
+  } catch(e) {
+    const cached = localCacheGet();
+    if (cached) return cached;
+    throw e;
+  }
 }
 
 async function dbGetBySector(sector) {
-  const snap = await db.collection(COL).where("sector", "==", sector).get();
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (isOffline()) {
+    const cached = localCacheGet();
+    if (cached) return cached.filter(d => d.sector === sector);
+  }
+  try {
+    const snap = await db.collection(COL).where("sector", "==", sector).get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) {
+    const cached = localCacheGet();
+    if (cached) return cached.filter(d => d.sector === sector);
+    throw e;
+  }
 }
 
 async function dbGetById(id) {
-  const docSnap = await db.collection(COL).doc(id).get();
-  return docSnap.exists ? { id: docSnap.id, ...docSnap.data() } : null;
+  if (isOffline()) {
+    const cached = localCacheGet();
+    if (cached) return cached.find(d => d.id === id) || null;
+  }
+  try {
+    const docSnap = await db.collection(COL).doc(id).get();
+    return docSnap.exists ? { id: docSnap.id, ...docSnap.data() } : null;
+  } catch(e) {
+    const cached = localCacheGet();
+    if (cached) return cached.find(d => d.id === id) || null;
+    throw e;
+  }
 }
 
 async function dbAdd(entry) {
