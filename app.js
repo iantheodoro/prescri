@@ -33,7 +33,8 @@ async function renderDiseaseList(filter = "") {
   showLoading();
   try {
     const items = (await window.dbGetBySector(currentSector))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
+      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
+      .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR'));
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição encontrada.<br/>Use ⚙ para adicionar.</div>`;
       return;
@@ -760,7 +761,7 @@ Object.assign(window, {
   saveShortcut, deleteShortcut, updatePediatricPrescriptionContext,
   renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField,
   removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
-  openIntubacao, calculateIntubacao, openSedacao, calculateSedacao, onSedDilutionChange
+  openIntubacao, calculateIntubacao, openSedacao, calculateSedacao
 });
 
 // ══════════════════════════════════════════════════════════
@@ -769,134 +770,19 @@ Object.assign(window, {
 
 const SEDATION_INFUSIONS = [
   {
-    id: "midazolam",
-    name: "Midazolam",
-    klass: "Benzodiazepínico",
-    accent: "#a78bfa",
+    id: "propofol",
+    name: "Propofol",
+    klass: "Sedativo",
+    concentration: 10,
+    concentrationLabel: "10 mg/mL",
+    dilution: "Frasco original 200 mg/20 mL - sem diluição",
     doseUnit: "mg/kg/h",
     flowUnit: "mL/h",
-    doseInfo: "Sedação: 0,02–0,1 mg/kg/h · RASS alvo: -2 a -3",
-    dilutions: [
-      {
-        label: "Padrão · 1 mg/mL",
-        concentration: 1,
-        recipe: "50 mg (10 mL a 5 mg/mL) + 40 mL SF0,9% → 50 mL · 1 mg/mL"
-      },
-      {
-        label: "Diluída · 0,5 mg/mL",
-        concentration: 0.5,
-        recipe: "50 mg (10 mL a 5 mg/mL) + 90 mL SF0,9% → 100 mL · 0,5 mg/mL"
-      }
-    ],
-    rangeCheck: (dose) => {
-      if (!Number.isFinite(dose) || dose <= 0) return "";
-      if (dose < 0.02) return "below";
-      if (dose <= 0.1) return "light";
-      if (dose <= 0.2) return "deep";
-      return "above";
-    },
-    rangeLabels: {
-      below: "Abaixo da faixa terapêutica",
-      light: "Faixa terapêutica",
-      deep: "Dose elevada — monitorar",
-      above: "Acima do limite recomendado"
-    }
-  },
-  {
-    id: "escetamina",
-    name: "Escetamina",
-    klass: "Anestésico Dissociativo",
-    accent: "#fb923c",
-    doseUnit: "mg/kg/h",
-    flowUnit: "mL/h",
-    doseInfo: "Dose Recomendada: 0,5–1 mg/kg/h",
-    dilutions: [
-      {
-        label: "Padrão · 2 mg/mL",
-        concentration: 2,
-        recipe: "Padrão: 10 mL (50 mg/mL) + 240 mL SF0,9% → 250 mL · 2 mg/mL"
-      }
-    ],
-    rangeCheck: (dose) => {
-      if (!Number.isFinite(dose) || dose <= 0) return "";
-      if (dose < 0.5) return "below";
-      if (dose <= 1) return "light";
-      if (dose <= 2) return "deep";
-      return "above";
-    },
-    rangeLabels: {
-      below: "Abaixo da faixa recomendada",
-      light: "Faixa recomendada",
-      deep: "Dose elevada — monitorar",
-      above: "Acima do limite recomendado"
-    }
-  },
-  {
-    id: "dexmedetomidina",
-    name: "Dexmedetomidina",
-    klass: "Alfa-2 Agonista",
-    accent: "#34d399",
-    doseUnit: "mcg/kg/h",
-    flowUnit: "mL/h",
-    doseInfo: "Manutenção: 0,2–0,7 mcg/kg/h · Máx: 1,4 mcg/kg/h\nSem depressão respiratória significativa",
-    dilutions: [
-      {
-        label: "Padrão · 4 mcg/mL",
-        concentration: 4,
-        recipe: "2 amp (400 mcg/4 mL) + 96 mL SF0,9% → 100 mL · 4 mcg/mL"
-      }
-    ],
-    rangeCheck: (dose) => {
-      if (!Number.isFinite(dose) || dose <= 0) return "";
-      if (dose < 0.2) return "below";
-      if (dose <= 0.7) return "light";
-      if (dose <= 1.4) return "deep";
-      return "above";
-    },
-    rangeLabels: {
-      below: "Abaixo da faixa de manutenção",
-      light: "Faixa de manutenção",
-      deep: "Dose elevada — próxima ao limite",
-      above: "Acima do limite recomendado"
-    }
-  },
-  {
-    id: "fentanil",
-    name: "Fentanil",
-    klass: "Opioide",
-    accent: "#f472b6",
-    doseUnit: "mcg/kg/min",
-    flowUnit: "mL/h",
-    doseInfo: "Analgesia contínua: 0,01–0,05 mcg/kg/min\nTitular pela escala de dor",
-    dilutions: [
-      {
-        label: "Padrão · 10 mcg/mL",
-        concentration: 10,
-        recipe: "Padrão: 5 amp (500 mcg/10 mL) + 40 mL SF0,9% → 50 mL · 10 mcg/mL"
-      }
-    ],
-    // Fentanil usa mcg/kg/min: concentração em mcg/mL, vazão em mL/h
-    // dose (mcg/kg/min) = (flow_mL_h * conc_mcg_mL) / (weight * 60)
-    // flow (mL/h) = dose * weight * 60 / conc
-    isPerMin: true,
-    rangeCheck: (dose) => {
-      if (!Number.isFinite(dose) || dose <= 0) return "";
-      if (dose < 0.01) return "below";
-      if (dose <= 0.05) return "light";
-      if (dose <= 0.1) return "deep";
-      return "above";
-    },
-    rangeLabels: {
-      below: "Abaixo da faixa analgésica",
-      light: "Faixa analgésica contínua",
-      deep: "Dose elevada — monitorar",
-      above: "Acima do limite habitual"
-    }
+    lightRange: "Leve: 0,3-1 mg/kg/h",
+    deepRange: "Profunda: 1-4 mg/kg/h",
+    recommendedLimit: "Limite recomendado: 4 mg/kg/h"
   }
 ];
-
-// Estado das diluições selecionadas por medicamento
-const _sedDilutionIndex = {};
 
 function openSedacao() {
   showScreen("screen-sedacao");
@@ -913,85 +799,67 @@ function getSedWeight() {
   return Number.isFinite(weight) && weight > 0 ? weight : 0;
 }
 
-function getSedConcentration(drug) {
-  const idx = _sedDilutionIndex[drug.id] || 0;
-  return drug.dilutions[idx].concentration;
+function getSedRangeClass(dose) {
+  if (!Number.isFinite(dose) || dose <= 0) return "";
+  if (dose < 0.3) return "below";
+  if (dose <= 1) return "light";
+  if (dose <= 4) return "deep";
+  return "above";
 }
 
-function onSedDilutionChange(drugId) {
-  const sel = document.getElementById(`${drugId}-dilution-sel`);
-  _sedDilutionIndex[drugId] = parseInt(sel.value, 10);
-  const drug = SEDATION_INFUSIONS.find(d => d.id === drugId);
-  if (!drug) return;
-  const recipe = document.getElementById(`${drugId}-recipe`);
-  if (recipe) recipe.textContent = drug.dilutions[_sedDilutionIndex[drugId]].recipe;
-  // Limpar inputs e recalcular
-  const flowInput = document.getElementById(`${drugId}-flow`);
-  const doseInput = document.getElementById(`${drugId}-dose`);
-  if (flowInput) flowInput.value = "";
-  if (doseInput) doseInput.value = "";
-  calculateSedacao();
+function getSedRangeLabel(dose) {
+  const cls = getSedRangeClass(dose);
+  if (cls === "below") return "Abaixo da faixa leve descrita";
+  if (cls === "light") return "Faixa leve";
+  if (cls === "deep") return "Faixa profunda";
+  if (cls === "above") return "Acima do limite recomendado";
+  return "";
 }
 
 function renderSedacao() {
   const target = document.getElementById("sed-results");
   if (!target) return;
 
-  target.innerHTML = SEDATION_INFUSIONS.map(drug => {
-    const multiDilution = drug.dilutions.length > 1;
-    const firstDilution = drug.dilutions[0];
-    const doseInfoLines = drug.doseInfo.split("\n");
-
-    return `
-    <article class="iot-drug-card sed-infusion-card" style="--iot-accent:${drug.accent}">
-      <div class="sed-drug-klass">${drug.klass}</div>
+  target.innerHTML = SEDATION_INFUSIONS.map(drug => `
+    <article class="iot-drug-card sed-infusion-card" style="--iot-accent:#38bdf8">
       <div class="iot-drug-name">${drug.name}</div>
-      <div class="sed-dose-info">
-        ${doseInfoLines.map((l, i) => i === 0
-          ? `<span>${l.replace(/([\d,–]+\s*(?:mg|mcg)\/kg\/(?:h|min))/g, '<strong>$1</strong>')}</span>`
-          : `<span class="sed-dose-info-sub">${l}</span>`
-        ).join("")}
+      <div class="iot-drug-class">${drug.klass}</div>
+      <div class="sed-targets">
+        <span>${drug.lightRange}</span>
+        <span>${drug.deepRange}</span>
+        <strong>${drug.recommendedLimit}</strong>
       </div>
 
-      <div class="sed-dilution-section">
-        <div class="sed-dilution-label">DILUIÇÃO</div>
-        ${multiDilution
-          ? `<select class="sed-dilution-select" id="${drug.id}-dilution-sel" onchange="onSedDilutionChange('${drug.id}')">
-              ${drug.dilutions.map((d, i) => `<option value="${i}">${d.label}</option>`).join("")}
-             </select>`
-          : `<div class="sed-dilution-select sed-dilution-single">${firstDilution.label}</div>`
-        }
-        <div class="sed-recipe" id="${drug.id}-recipe">${firstDilution.recipe}</div>
+      <div class="sed-dilution">
+        <span>Apresentação</span>
+        <strong>${drug.dilution}</strong>
+        <em>${drug.concentrationLabel}</em>
       </div>
 
       <div class="sed-calc-grid">
         <div class="sed-calc-panel">
-          <div class="sed-panel-title">DOSE → VAZÃO</div>
+          <div class="ped-pres-label">Vazão -> Dose</div>
           <div class="sed-calc-row">
-            <input class="sed-input" type="number" id="${drug.id}-dose" min="0" step="0.01"
-              placeholder="${drug.doseUnit}" oninput="calculateSedacao()" />
-            <span class="sed-unit">${drug.doseUnit}</span>
-            <span class="sed-arrow">→</span>
-            <strong class="sed-result" id="${drug.id}-flow-result">—</strong>
-            <span class="sed-unit">${drug.flowUnit}</span>
-          </div>
-        </div>
-
-        <div class="sed-calc-panel">
-          <div class="sed-panel-title">VAZÃO → DOSE</div>
-          <div class="sed-calc-row">
-            <input class="sed-input" type="number" id="${drug.id}-flow" min="0" step="0.1"
-              placeholder="${drug.flowUnit}" oninput="calculateSedacao()" />
-            <span class="sed-unit">${drug.flowUnit}</span>
-            <span class="sed-arrow">→</span>
-            <strong class="sed-result" id="${drug.id}-dose-result">—</strong>
-            <span class="sed-unit">${drug.doseUnit}</span>
+            <input type="number" id="${drug.id}-flow" min="0" step="0.1" placeholder="mL/h" oninput="calculateSedacao()" />
+            <span>${drug.flowUnit}</span>
+            <strong id="${drug.id}-dose-result">—</strong>
+            <span>${drug.doseUnit}</span>
           </div>
           <div class="sed-range-badge" id="${drug.id}-range"></div>
         </div>
+
+        <div class="sed-calc-panel">
+          <div class="ped-pres-label">Dose -> Vazão</div>
+          <div class="sed-calc-row">
+            <input type="number" id="${drug.id}-dose" min="0" step="0.1" placeholder="mg/kg/h" oninput="calculateSedacao()" />
+            <span>${drug.doseUnit}</span>
+            <strong id="${drug.id}-flow-result">—</strong>
+            <span>${drug.flowUnit}</span>
+          </div>
+        </div>
       </div>
     </article>
-  `}).join("");
+  `).join("");
 
   calculateSedacao();
 }
@@ -999,42 +867,28 @@ function renderSedacao() {
 function calculateSedacao() {
   const weight = getSedWeight();
   SEDATION_INFUSIONS.forEach(drug => {
-    const flowInput   = document.getElementById(`${drug.id}-flow`);
-    const doseInput   = document.getElementById(`${drug.id}-dose`);
-    const doseResult  = document.getElementById(`${drug.id}-dose-result`);
-    const flowResult  = document.getElementById(`${drug.id}-flow-result`);
-    const rangeBadge  = document.getElementById(`${drug.id}-range`);
-    if (!flowInput || !doseInput || !doseResult || !flowResult || !rangeBadge) return;
+    const flowInput = document.getElementById(`${drug.id}-flow`);
+    const doseInput = document.getElementById(`${drug.id}-dose`);
+    const doseResult = document.getElementById(`${drug.id}-dose-result`);
+    const flowResult = document.getElementById(`${drug.id}-flow-result`);
+    const range = document.getElementById(`${drug.id}-range`);
+    if (!flowInput || !doseInput || !doseResult || !flowResult || !range) return;
 
-    const conc        = getSedConcentration(drug);
-    const flow        = parseLocaleNumber(flowInput.value);
+    const flow = parseLocaleNumber(flowInput.value);
     const desiredDose = parseLocaleNumber(doseInput.value);
+    const calculatedDose = weight && Number.isFinite(flow) && flow > 0
+      ? (flow * drug.concentration) / weight
+      : NaN;
+    const calculatedFlow = weight && Number.isFinite(desiredDose) && desiredDose > 0
+      ? (desiredDose * weight) / drug.concentration
+      : NaN;
 
-    let calculatedDose, calculatedFlow;
-    if (drug.isPerMin) {
-      // dose (mcg/kg/min) = (mL/h * mcg/mL) / (kg * 60)
-      calculatedDose = weight && Number.isFinite(flow) && flow > 0
-        ? (flow * conc) / (weight * 60) : NaN;
-      // flow (mL/h) = dose * kg * 60 / conc
-      calculatedFlow = weight && Number.isFinite(desiredDose) && desiredDose > 0
-        ? (desiredDose * weight * 60) / conc : NaN;
-    } else {
-      // dose (mg or mcg /kg/h) = (mL/h * conc) / kg
-      calculatedDose = weight && Number.isFinite(flow) && flow > 0
-        ? (flow * conc) / weight : NaN;
-      // flow (mL/h) = dose * kg / conc
-      calculatedFlow = weight && Number.isFinite(desiredDose) && desiredDose > 0
-        ? (desiredDose * weight) / conc : NaN;
-    }
-
-    const doseDigits = drug.isPerMin ? 3 : 2;
-    doseResult.textContent = formatSedNumber(calculatedDose, doseDigits);
+    doseResult.textContent = formatSedNumber(calculatedDose, 2);
     flowResult.textContent = formatSedNumber(calculatedFlow, 1);
 
-    const cls   = drug.rangeCheck(calculatedDose);
-    const label = cls ? (drug.rangeLabels[cls] || "") : "";
-    rangeBadge.textContent = label;
-    rangeBadge.className   = `sed-range-badge ${cls}`;
+    const label = getSedRangeLabel(calculatedDose);
+    range.textContent = label;
+    range.className = `sed-range-badge ${getSedRangeClass(calculatedDose)}`;
   });
 }
 
@@ -1338,7 +1192,8 @@ async function renderPedDiseaseList(filter = "") {
   showLoading();
   try {
     const items = (await window.dbGetBySector("Pediatria"))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
+      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
+      .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR'));
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
       return;
@@ -1377,4 +1232,3 @@ window.openIntubacao = openIntubacao;
 window.calculateIntubacao = calculateIntubacao;
 window.openSedacao = openSedacao;
 window.calculateSedacao = calculateSedacao;
-window.onSedDilutionChange = onSedDilutionChange;
