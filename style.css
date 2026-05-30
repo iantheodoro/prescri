@@ -1422,6 +1422,9 @@ html, body {
 /* ── Sedação contínua ─────────────────────────────────── */
 .sed-card {
   max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .sed-infusion-card {

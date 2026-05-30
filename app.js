@@ -772,6 +772,7 @@ const SEDATION_INFUSIONS = [
     id: "midazolam",
     name: "Midazolam",
     klass: "Benzodiazepínico",
+    accent: "#a78bfa",
     doseUnit: "mg/kg/h",
     flowUnit: "mL/h",
     doseInfo: "Sedação: 0,02–0,1 mg/kg/h · RASS alvo: -2 a -3",
@@ -805,6 +806,7 @@ const SEDATION_INFUSIONS = [
     id: "escetamina",
     name: "Escetamina",
     klass: "Anestésico Dissociativo",
+    accent: "#fb923c",
     doseUnit: "mg/kg/h",
     flowUnit: "mL/h",
     doseInfo: "Dose Recomendada: 0,5–1 mg/kg/h",
@@ -833,6 +835,7 @@ const SEDATION_INFUSIONS = [
     id: "dexmedetomidina",
     name: "Dexmedetomidina",
     klass: "Alfa-2 Agonista",
+    accent: "#34d399",
     doseUnit: "mcg/kg/h",
     flowUnit: "mL/h",
     doseInfo: "Manutenção: 0,2–0,7 mcg/kg/h · Máx: 1,4 mcg/kg/h\nSem depressão respiratória significativa",
@@ -861,6 +864,7 @@ const SEDATION_INFUSIONS = [
     id: "fentanil",
     name: "Fentanil",
     klass: "Opioide",
+    accent: "#f472b6",
     doseUnit: "mcg/kg/min",
     flowUnit: "mL/h",
     doseInfo: "Analgesia contínua: 0,01–0,05 mcg/kg/min\nTitular pela escala de dor",
@@ -939,7 +943,7 @@ function renderSedacao() {
     const doseInfoLines = drug.doseInfo.split("\n");
 
     return `
-    <article class="iot-drug-card sed-infusion-card" style="--iot-accent:#38bdf8">
+    <article class="iot-drug-card sed-infusion-card" style="--iot-accent:${drug.accent}">
       <div class="sed-drug-klass">${drug.klass}</div>
       <div class="iot-drug-name">${drug.name}</div>
       <div class="sed-dose-info">
@@ -962,6 +966,18 @@ function renderSedacao() {
 
       <div class="sed-calc-grid">
         <div class="sed-calc-panel">
+          <div class="sed-panel-title">DOSE → VAZÃO</div>
+          <div class="sed-calc-row">
+            <input class="sed-input" type="number" id="${drug.id}-dose" min="0" step="0.01"
+              placeholder="${drug.doseUnit}" oninput="calculateSedacao()" />
+            <span class="sed-unit">${drug.doseUnit}</span>
+            <span class="sed-arrow">→</span>
+            <strong class="sed-result" id="${drug.id}-flow-result">—</strong>
+            <span class="sed-unit">${drug.flowUnit}</span>
+          </div>
+        </div>
+
+        <div class="sed-calc-panel">
           <div class="sed-panel-title">VAZÃO → DOSE</div>
           <div class="sed-calc-row">
             <input class="sed-input" type="number" id="${drug.id}-flow" min="0" step="0.1"
@@ -972,18 +988,6 @@ function renderSedacao() {
             <span class="sed-unit">${drug.doseUnit}</span>
           </div>
           <div class="sed-range-badge" id="${drug.id}-range"></div>
-        </div>
-
-        <div class="sed-calc-panel">
-          <div class="sed-panel-title">DOSE → VAZÃO</div>
-          <div class="sed-calc-row">
-            <input class="sed-input" type="number" id="${drug.id}-dose" min="0" step="0.01"
-              placeholder="${drug.doseUnit}" oninput="calculateSedacao()" />
-            <span class="sed-unit">${drug.doseUnit}</span>
-            <span class="sed-arrow">→</span>
-            <strong class="sed-result" id="${drug.id}-flow-result">—</strong>
-            <span class="sed-unit">${drug.flowUnit}</span>
-          </div>
         </div>
       </div>
     </article>
