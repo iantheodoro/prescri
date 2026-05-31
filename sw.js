@@ -2,9 +2,9 @@
 //  sw.js — Service Worker — PrescriçõesMed
 // ============================================================
 
-const CACHE_NAME = "rxmed-v31050931";
+const CACHE_NAME = "rxmed-v31050932";
 
-const STATIC_ASSETS = [
+const SITE_ASSETS = [
   "/prescri/index.html",
   "/prescri/style.css",
   "/prescri/app.js",
@@ -14,22 +14,24 @@ const STATIC_ASSETS = [
   "/prescri/manifest.json",
   "/prescri/icon-192.png",
   "/prescri/icon-512.png",
-  // Scripts do Firebase — precisam estar cacheados para funcionar offline
+];
+
+const EXTERNAL_ASSETS = [
   "https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js",
   "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js",
-  // Fontes
   "https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap"
 ];
 
 // ── Install ─────────────────────────────────────────────
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // Adiciona um por um para não falhar tudo se uma fonte não carregar
-      return Promise.allSettled(
-        STATIC_ASSETS.map(url => cache.add(url).catch(e => console.warn("Cache miss:", url, e)))
-      );
-    })
+    caches.open(CACHE_NAME).then(cache =>
+      Promise.allSettled(
+        [...SITE_ASSETS, ...EXTERNAL_ASSETS].map(url =>
+          cache.add(url).catch(e => console.warn("Cache miss:", url, e))
+        )
+      )
+    )
   );
   self.skipWaiting();
 });
@@ -44,11 +46,11 @@ self.addEventListener("activate", event => {
   self.clients.claim();
 });
 
-// ── Fetch: cache-first para tudo ─────────────────────────
+// ── Fetch ────────────────────────────────────────────────
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
 
-  // Requisições do Firestore (dados): network-first, sem fallback de dados
+  // Firestore: sempre tenta a rede
   if (url.hostname.includes("firestore.googleapis.com")) {
     event.respondWith(
       fetch(event.request).catch(() =>
@@ -60,19 +62,33 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // Tudo mais (incluindo scripts Firebase, fontes, assets): cache-first
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      if (cached) return cached;
+  // Assets externos (Firebase, fontes): cache-first (raramente mudam)
+  const isExternal = url.hostname.includes("gstatic.com") ||
+                     url.hostname.includes("fonts.googleapis.com") ||
+                     url.hostname.includes("fonts.gstatic.com");
 
-      return fetch(event.request).then(response => {
-        // Cacheia dinamicamente qualquer asset novo bem-sucedido
+  if (isExternal) {
+    event.respondWith(
+      caches.match(event.request).then(cached => cached || fetch(event.request))
+    );
+    return;
+  }
+
+  // Assets do proprio site: network-first -> atualiza sempre que online
+  // Se offline, serve do cache
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
-      }).catch(() => caches.match("/prescri/index.html"));
-    })
+      })
+      .catch(() =>
+        caches.match(event.request).then(cached =>
+          cached || caches.match("/prescri/index.html")
+        )
+      )
   );
 });
