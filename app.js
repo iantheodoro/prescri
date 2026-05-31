@@ -33,8 +33,7 @@ async function renderDiseaseList(filter = "") {
   showLoading();
   try {
     const items = (await window.dbGetBySector(currentSector))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
-      .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR'));
+      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição encontrada.<br/>Use ⚙ para adicionar.</div>`;
       return;
@@ -114,6 +113,12 @@ function copyPrescription() {
       document.getElementById("copy-feedback").classList.remove("show");
     }, 2500);
   });
+}
+
+function editCurrentPrescription() {
+  if (!currentPrescription) return;
+  openAdmin();
+  startEdit(currentPrescription.id);
 }
 
 function isPediatricPrescription(p = currentPrescription) {
@@ -752,7 +757,7 @@ window.addEventListener("load", async () => {
 });
 
 Object.assign(window, {
-  selectSector, goBack, openPrescription, copyPrescription, filterDiseases,
+  selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, filterDiseases,
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, removeVariant, addNewVariantField, removeNewVariant,
@@ -1192,8 +1197,7 @@ async function renderPedDiseaseList(filter = "") {
   showLoading();
   try {
     const items = (await window.dbGetBySector("Pediatria"))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
-      .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR'));
+      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
       return;

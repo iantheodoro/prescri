@@ -74,15 +74,10 @@ html, body {
 .welcome-content {
   position: relative; z-index: 2;
   display: flex; flex-direction: column;
-  align-items: center;
-  min-height: 100%;
-  padding: 40px 24px 60px;
+  align-items: center; justify-content: center;
+  min-height: 100vh;
+  padding: 40px 24px;
   text-align: center;
-}
-
-/* Centraliza verticalmente so quando o conteudo cabe na tela */
-@media (min-height: 800px) {
-  .welcome-content { justify-content: center; }
 }
 
 .logo-badge {
@@ -388,6 +383,26 @@ html, body {
 
 .copy-icon { font-size: 18px; }
 
+.btn-rx-edit {
+  display: flex; align-items: center; gap: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-hi);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 13px 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.btn-rx-edit:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .copy-feedback {
   font-family: var(--font-mono);
   font-size: 13px;
@@ -585,9 +600,7 @@ html, body {
 
 /* ── Mobile ───────────────────────────────────────────── */
 @media (max-width: 600px) {
-  .sector-grid { grid-template-columns: 1fr; max-width: 100%; }
-  .sector-grid-special { max-width: 100%; }
-  .sector-card { padding: 20px 16px; }
+  .sector-grid { grid-template-columns: 1fr; max-width: 360px; }
   .rx-text { font-size: 12.5px; }
   .btn-copy { width: 100%; justify-content: center; }
   .modal-overlay { padding: 0; align-items: flex-end; }

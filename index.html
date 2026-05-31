@@ -4,9 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PrescriçõesMed</title>
-  <meta name="theme-color" content="#0a0c10" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260530-3" />
@@ -129,6 +126,7 @@
         <button class="btn-copy" id="btn-copy" onclick="copyPrescription()">
           <span class="copy-icon">⎘</span> Copiar Prescrição
         </button>
+        <button class="btn-rx-edit" onclick="editCurrentPrescription()">✎ Editar</button>
         <div class="copy-feedback" id="copy-feedback">✓ Copiado!</div>
       </div>
     </div>
@@ -471,15 +469,5 @@
   <script src="pediatria.js?v=20260530-3"></script>
   <script src="db.js?v=20260530-3"></script>
   <script src="app.js?v=20260530-3"></script>
-
-  <script>
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("/prescri/sw.js")
-          .then(reg => console.log("SW registrado:", reg.scope))
-          .catch(err => console.warn("SW falhou:", err));
-      });
-    }
-  </script>
 </body>
 </html>
