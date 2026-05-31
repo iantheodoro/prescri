@@ -75,7 +75,7 @@ async function openPrescription(id) {
     currentPrescription = p;
     currentVariantIndex = 0;
 
-    document.getElementById("rx-title").textContent = p.disease;
+    document.getElementById("rx-disease-name").textContent = p.disease;  // CORRIGIDO: id correto
     
     // Configura inputs de contexto caso seja do setor Pediatria
     const pedCtx = document.getElementById("rx-pediatric-context");
@@ -104,7 +104,7 @@ function isPediatricPrescription() {
 }
 
 function renderVariantTabs() {
-  const container = document.getElementById("rx-tabs-container");
+  const container = document.getElementById("variant-tabs");  // CORRIGIDO
   container.innerHTML = "";
   const v = currentPrescription.variants || [];
   if (v.length <= 1) return;
@@ -126,10 +126,10 @@ function switchVariant(idx, btn) {
 }
 
 function renderVariantContent(idx) {
-  const body = document.getElementById("rx-body");
+  const body = document.getElementById("rx-text");  // CORRIGIDO
   const v = currentPrescription.variants && currentPrescription.variants[idx];
   if (!v) {
-    body.innerHTML = "Nenhum texto disponível.";
+    body.innerText = "Nenhum texto disponível.";
     return;
   }
 
@@ -155,7 +155,6 @@ function updatePediatricPrescriptionContext() {
   if (mainWeight) mainWeight.value = wText;
   if (mainAge) mainAge.value = aText;
 
-  // Recalcula doses se houver uma calculadora ativa (ped-ui)
   if (window.onPedInput) {
     window.onPedInput();
   }
@@ -237,23 +236,18 @@ function buildPediatricMarkerMap(weight, age) {
 
 // ── Edição Inline (contentEditable) e Cópia ────────────────
 function setRxEditMode(mode) {
-  const body = document.getElementById("rx-body");
-  const editBtn = document.getElementById("btn-edit-rx");
-  const saveBtn = document.getElementById("btn-save-rx");
-  
+  const body = document.getElementById("rx-text");
+  // Nota: os botões btn-edit-rx e btn-save-rx não existem no HTML atual.
+  // Se quiser edição, recrie esses botões. Por ora, apenas desabilita edição.
   if (mode) {
     body.contentEditable = "true";
     body.classList.add("editing");
-    if (editBtn) editBtn.style.display = "none";
-    if (saveBtn) saveBtn.style.display = "inline-flex";
     if (window.openShortcutPicker) {
       body.onfocus = () => window.openShortcutPicker(body);
     }
   } else {
     body.contentEditable = "false";
     body.classList.remove("editing");
-    if (editBtn) editBtn.style.display = "inline-flex";
-    if (saveBtn) saveBtn.style.display = "none";
     body.onfocus = null;
     if (window.closeShortcutPicker) window.closeShortcutPicker();
   }
@@ -263,13 +257,13 @@ function editCurrentPrescription() {
   setRxEditMode(true);
   const v = currentPrescription.variants && currentPrescription.variants[currentVariantIndex];
   if (v) {
-    document.getElementById("rx-body").innerText = v.text || "";
+    document.getElementById("rx-text").innerText = v.text || "";
   }
 }
 
 async function saveRxInlineEdit() {
   if (!currentPrescription) return;
-  const newText = document.getElementById("rx-body").innerText;
+  const newText = document.getElementById("rx-text").innerText;
   
   currentPrescription.variants[currentVariantIndex].text = newText;
   showLoading();
@@ -287,7 +281,7 @@ async function saveRxInlineEdit() {
 }
 
 function copyPrescription() {
-  const body = document.getElementById("rx-body");
+  const body = document.getElementById("rx-text");
   const text = body.innerText;
   navigator.clipboard.writeText(text).then(() => {
     const feedback = document.getElementById("copy-feedback");
@@ -583,14 +577,9 @@ function copyPedResult() {
   const interval = document.getElementById("ped-dose-interval").textContent;
   const pres = [...document.querySelectorAll(".ped-pres-item")].map(el => {
     return `  • ${el.querySelector(".ped-pres-name").textContent}: ${el.querySelector(".ped-pres-vol").textContent}`;
-  }).join("
-");
+  }).join("\n");
 
-  const text = `${drug.name} — Peso: ${weight} kg
-Dose: ${doseCalc}
-Intervalo: ${interval}
-Apresentações:
-${pres}`;
+  const text = `${drug.name} — Peso: ${weight} kg\nDose: ${doseCalc}\nIntervalo: ${interval}\nApresentações:\n${pres}`;
   navigator.clipboard.writeText(text).then(() => {
     const fb = document.getElementById("ped-copy-feedback");
     if (fb) {
@@ -652,18 +641,47 @@ function updatePedMarkerPreview() {}
 // ============================================================
 
 function openIntubacao() { showScreen("screen-intubacao"); }
+
 function calculateIntubacao() {
-  const w = parseLocaleNumber(document.getElementById("int-weight").value);
-  const res = document.getElementById("int-results");
-  if (!w || w <= 0) { res.style.display = "none"; return; }
-  
-  document.getElementById("calc-etomidato").textContent = `${(w * 0.3).toFixed(1).replace(".", ",")} mg (${(w * 0.15).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-propofol").textContent  = `${(w * 1.5).toFixed(1).replace(".", ",")} mg (${(w * 0.15).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-fentanil").textContent  = `${(w * 3).toFixed(0)} mcg (${((w * 3)/50).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-succi").textContent     = `${(w * 1.5).toFixed(1).replace(".", ",")} mg (${(w * 0.03).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-rocuronio").textContent = `${(w * 1.2).toFixed(1).replace(".", ",")} mg (${(w * 0.12).toFixed(1).replace(".", ",")} mL)`;
-  
-  res.style.display = "block";
+  const weightInput = document.getElementById("int-weight");
+  if (!weightInput) return;
+  const weight = parseFloat(weightInput.value);
+  const resultsDiv = document.getElementById("int-results");
+  const placeholder = document.getElementById("int-placeholder");
+
+  if (!weight || weight <= 0) {
+    if (resultsDiv) resultsDiv.style.display = "none";
+    if (placeholder) placeholder.style.display = "flex";
+    return;
+  }
+
+  // Cálculos
+  const etomidatoMg = (weight * 0.3).toFixed(1);
+  const etomidatoMl = (weight * 0.15).toFixed(1);
+  const propofolMg = (weight * 1.5).toFixed(1);
+  const propofolMl = (weight * 0.15).toFixed(1);
+  const fentanilMcg = (weight * 3).toFixed(0);
+  const fentanilMl = ((weight * 3) / 50).toFixed(1);
+  const succiMg = (weight * 1.5).toFixed(1);
+  const succiMl = (weight * 0.03).toFixed(1);
+  const rocuronioMg = (weight * 1.2).toFixed(1);
+  const rocuronioMl = (weight * 0.12).toFixed(1);
+
+  // Atualizar DOM
+  const elemEtomidato = document.getElementById("calc-etomidato");
+  const elemPropofol = document.getElementById("calc-propofol");
+  const elemFentanil = document.getElementById("calc-fentanil");
+  const elemSucci = document.getElementById("calc-succi");
+  const elemRocuronio = document.getElementById("calc-rocuronio");
+
+  if (elemEtomidato) elemEtomidato.innerHTML = `${etomidatoMg} mg <span style="font-size:12px;">(${etomidatoMl} mL)</span>`;
+  if (elemPropofol) elemPropofol.innerHTML = `${propofolMg} mg <span style="font-size:12px;">(${propofolMl} mL)</span>`;
+  if (elemFentanil) elemFentanil.innerHTML = `${fentanilMcg} mcg <span style="font-size:12px;">(${fentanilMl} mL)</span>`;
+  if (elemSucci) elemSucci.innerHTML = `${succiMg} mg <span style="font-size:12px;">(${succiMl} mL)</span>`;
+  if (elemRocuronio) elemRocuronio.innerHTML = `${rocuronioMg} mg <span style="font-size:12px;">(${rocuronioMl} mL)</span>`;
+
+  if (resultsDiv) resultsDiv.style.display = "block";
+  if (placeholder) placeholder.style.display = "none";
 }
 
 function openSedacao() { showScreen("screen-sedacao"); }
@@ -674,7 +692,7 @@ function calculateSedacao() {
   const vazao = parseLocaleNumber(document.getElementById("sed-vazao").value) || 0;
   const label = document.getElementById("sed-range-label");
   
-  if (!w || !vazao) { label.style.display = "none"; return; }
+  if (!w || !vazao) { if(label) label.style.display = "none"; return; }
   
   const totalVol = 100 + fentanilMl + midazMl;
   const fentanilMcgTotal = fentanilMl * 50;

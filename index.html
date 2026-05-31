@@ -1,473 +1,100 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PrescriçõesMed</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260530-3" />
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-</head>
-<body>
-
-  <!-- WELCOME SCREEN -->
-  <div id="screen-welcome" class="screen active">
-    <div class="bg-grid"></div>
-    <div class="welcome-content">
-      <div class="logo-badge">RX</div>
-      <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
-      <p class="welcome-sub">Selecione o setor de atendimento</p>
-
-      <div class="sector-group-label">Pronto Atendimento</div>
-      <div class="sector-grid">
-        <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
-          <div class="sector-icon">🩺</div>
-          <div class="sector-name">Sala Verde</div>
-          <div class="sector-desc">Média complexidade</div>
-        </button>
-        <button class="sector-card" data-sector="Sala Vermelha" onclick="selectSector(this)">
-          <div class="sector-icon">🚨</div>
-          <div class="sector-name">Sala Vermelha</div>
-          <div class="sector-desc">Emergências críticas</div>
-        </button>
-        <button class="sector-card" data-sector="UTI" onclick="selectSector(this)">
-          <div class="sector-icon">🫀</div>
-          <div class="sector-name">UTI</div>
-          <div class="sector-desc">Terapia Intensiva</div>
-        </button>
-      </div>
-
-      <div class="sector-group-label" style="margin-top:28px">Populações Especiais</div>
-      <div class="sector-grid sector-grid-special">
-        <button class="sector-card sector-card-special" onclick="openPediatria()">
-          <div class="sector-icon">👶</div>
-          <div class="sector-name">Pediatria</div>
-          <div class="sector-desc">Calculadora de doses + prescrições</div>
-        </button>
-        <button class="sector-card sector-card-special" data-sector="GO" onclick="selectSector(this)">
-          <div class="sector-icon">🤰</div>
-          <div class="sector-name">GO</div>
-          <div class="sector-desc">Ginecologia e Obstetrícia</div>
-        </button>
-      </div>
-
-      <div class="sector-group-label" style="margin-top:28px">Ferramentas Clínicas</div>
-      <div class="sector-grid sector-grid-special">
-        <button class="sector-card sector-card-special" onclick="openIntubacao()">
-          <div class="sector-icon">🫁</div>
-          <div class="sector-name">Intubação</div>
-          <div class="sector-desc">Doses para IOT por peso</div>
-        </button>
-        <button class="sector-card sector-card-special" onclick="openSedacao()">
-          <div class="sector-icon">💧</div>
-          <div class="sector-name">Sedação contínua</div>
-          <div class="sector-desc">Infusão bidirecional por peso</div>
-        </button>
-      </div>
-    </div>
+<!-- INTUBAÇÃO SCREEN -->
+<div id="screen-intubacao" class="screen">
+  <div class="bg-grid"></div>
+  <div class="top-bar">
+    <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+    <div class="sector-badge" style="background:rgba(248,113,113,0.12);border-color:#f87171;color:#f87171">🫁 Intubação</div>
   </div>
 
-  <!-- DISEASE SELECTION SCREEN -->
-  <div id="screen-disease" class="screen">
-    <div class="bg-grid"></div>
-    <div class="top-bar">
-      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
-      <div class="sector-badge" id="active-sector-label"></div>
-      <button class="btn-admin" onclick="openAdmin()">⚙ Gerenciar</button>
+  <div class="iot-content">
+    <div class="rx-header">
+      <span class="rx-tag">CALCULADORA</span>
+      <h2 class="rx-title">Intubação Orotraqueal</h2>
     </div>
-    <div class="disease-content">
-      <h2 class="section-title">Selecione a <em>doença</em></h2>
-      <div class="search-wrap">
-        <input type="text" id="search-input" placeholder="Buscar diagnóstico..." oninput="filterDiseases()" />
-      </div>
-      <div class="disease-list" id="disease-list"></div>
-    </div>
-  </div>
 
-  <!-- PRESCRIPTION SCREEN -->
-  <div id="screen-prescription" class="screen">
-    <div class="bg-grid"></div>
-    <div class="top-bar">
-      <button class="btn-back" onclick="goBack('screen-disease')">← Voltar</button>
-      <div class="sector-badge" id="rx-sector-label"></div>
-    </div>
-    <div class="rx-content">
-      <div class="rx-header">
-        <span class="rx-tag">PRESCRIÇÃO</span>
-        <h2 class="rx-title" id="rx-disease-name"></h2>
+    <div class="iot-weight-card">
+      <label class="ped-label">Peso do paciente (kg)</label>
+      <div class="ped-weight-row">
+        <input type="number" id="int-weight" min="1" max="250" step="1" value="70" oninput="calculateIntubacao()" />
+        <span class="ped-weight-unit">kg</span>
       </div>
-      <div id="variant-tabs" class="variant-tabs"></div>
-      <div id="rx-ped-context" class="rx-ped-context" style="display:none">
-        <div class="rx-ped-field">
-          <label for="rx-ped-weight">Peso</label>
-          <div class="rx-ped-input-wrap">
-            <input type="number" id="rx-ped-weight" min="1" max="100" step="0.1" placeholder="12,5" oninput="updatePediatricPrescriptionContext()" />
-            <span>kg</span>
+    </div>
+
+    <div class="iot-warning">
+      ⚠️ Ferramenta auxiliar. Não substitui julgamento clínico, protocolos locais ou checagem independente.
+    </div>
+
+    <div id="int-results" style="display: none;">
+      <div class="iot-grid">
+        <!-- Etomidato -->
+        <div class="iot-drug-card" style="--iot-accent: #fbbf24;">
+          <div class="iot-drug-name">Etomidato</div>
+          <div class="iot-drug-class">Hipnótico</div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Dose</span>
+            <span class="iot-dose-value" id="calc-etomidato">—</span>
+          </div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Apresentação</span>
+            <span class="iot-dose-value">20 mg/10 mL</span>
           </div>
         </div>
-        <div class="rx-ped-field">
-          <label for="rx-ped-age">Idade</label>
-          <div class="rx-ped-input-wrap">
-            <input type="number" id="rx-ped-age" min="0" max="18" step="0.1" placeholder="4" oninput="updatePediatricPrescriptionContext()" />
-            <span>anos</span>
+        <!-- Propofol -->
+        <div class="iot-drug-card" style="--iot-accent: #38bdf8;">
+          <div class="iot-drug-name">Propofol</div>
+          <div class="iot-drug-class">Hipnótico</div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Dose</span>
+            <span class="iot-dose-value" id="calc-propofol">—</span>
+          </div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Apresentação</span>
+            <span class="iot-dose-value">10 mg/mL</span>
+          </div>
+        </div>
+        <!-- Fentanil -->
+        <div class="iot-drug-card" style="--iot-accent: #86efac;">
+          <div class="iot-drug-name">Fentanil</div>
+          <div class="iot-drug-class">Opioide</div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Dose</span>
+            <span class="iot-dose-value" id="calc-fentanil">—</span>
+          </div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Apresentação</span>
+            <span class="iot-dose-value">50 mcg/mL</span>
+          </div>
+        </div>
+        <!-- Succinilcolina -->
+        <div class="iot-drug-card" style="--iot-accent: #fca5a5;">
+          <div class="iot-drug-name">Succinilcolina</div>
+          <div class="iot-drug-class">Bloqueador despolarizante</div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Dose</span>
+            <span class="iot-dose-value" id="calc-succi">—</span>
+          </div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Apresentação</span>
+            <span class="iot-dose-value">50 mg/mL</span>
+          </div>
+        </div>
+        <!-- Rocurônio -->
+        <div class="iot-drug-card" style="--iot-accent: #c4b5fd;">
+          <div class="iot-drug-name">Rocurônio</div>
+          <div class="iot-drug-class">Bloqueador não despolarizante</div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Dose</span>
+            <span class="iot-dose-value" id="calc-rocuronio">—</span>
+          </div>
+          <div class="iot-dose-row">
+            <span class="iot-dose-label">Apresentação</span>
+            <span class="iot-dose-value">10 mg/mL</span>
           </div>
         </div>
       </div>
-      <div class="rx-card">
-        <div class="rx-card-header">
-          <span class="rx-symbol">℞</span>
-          <span class="rx-date" id="rx-date"></span>
-        </div>
-        <pre class="rx-text" id="rx-text"></pre>
-      </div>
-      <div class="rx-actions">
-        <button class="btn-copy" id="btn-copy" onclick="copyPrescription()">
-          <span class="copy-icon">⎘</span> Copiar Prescrição
-        </button>
-        <button class="btn-rx-edit" id="btn-rx-edit" onclick="editCurrentPrescription()">✎ Editar</button>
-        <div class="copy-feedback" id="copy-feedback">✓ Copiado!</div>
-      </div>
+    </div>
+    <div id="int-placeholder" style="display: flex; justify-content: center; padding: 40px; color: var(--text-muted);">
+      Insira o peso para calcular as doses
     </div>
   </div>
-
-  <!-- ═══════════════════════════════════════════════════════
-       PEDIATRIA SCREEN
-  ═══════════════════════════════════════════════════════ -->
-  <div id="screen-pediatria" class="screen">
-    <div class="bg-grid"></div>
-    <div class="top-bar">
-      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
-      <div class="sector-badge" style="background:rgba(251,191,36,0.15);border-color:#fbbf24;color:#fbbf24">👶 Pediatria</div>
-      <button class="btn-admin" onclick="openAdmin()">⚙ Gerenciar</button>
-    </div>
-
-    <div class="ped-content">
-      <!-- ABAS PEDIATRIA -->
-      <div class="ped-tabs">
-        <button class="ped-tab active" onclick="switchPedTab('ped-calc', this)">🧮 Calculadora</button>
-        <button class="ped-tab" onclick="switchPedTab('ped-rx', this)">📋 Prescrições</button>
-      </div>
-
-      <!-- CALCULADORA -->
-      <div id="ped-calc" class="ped-tab-content active">
-        <div class="ped-weight-card">
-          <label class="ped-label">Peso da criança (kg)</label>
-          <div class="ped-weight-row">
-            <input type="number" id="ped-weight" min="1" max="100" step="0.1"
-              placeholder="ex: 12,5" oninput="calculateDose()" />
-            <span class="ped-weight-unit">kg</span>
-          </div>
-          <label class="ped-label" style="margin-top:12px">Idade (anos)</label>
-          <div class="ped-weight-row">
-            <input type="number" id="ped-age" min="0" max="18" step="0.1"
-              placeholder="ex: 4" oninput="calculateDose()" />
-            <span class="ped-weight-unit">anos</span>
-          </div>
-          <label class="ped-label" style="margin-top:12px">Medicamento</label>
-          <select id="ped-drug" onchange="calculateDose()">
-            <option value="">Selecionar medicamento...</option>
-          </select>
-        </div>
-
-        <div id="ped-result" class="ped-result" style="display:none">
-          <div class="ped-result-header">
-            <span id="ped-result-drug"></span>
-            <span class="ped-result-route" id="ped-result-route"></span>
-          </div>
-
-          <div class="ped-dose-box">
-            <div class="ped-dose-label">Dose por kg</div>
-            <div class="ped-dose-value" id="ped-dose-per-kg"></div>
-          </div>
-
-          <div class="ped-dose-box ped-dose-highlight">
-            <div class="ped-dose-label">Dose calculada</div>
-            <div class="ped-dose-value" id="ped-dose-calc"></div>
-            <div class="ped-dose-sub" id="ped-dose-interval"></div>
-          </div>
-
-          <div class="ped-presentations">
-            <div class="ped-pres-label">Volumes / Quantidades por apresentação</div>
-            <div id="ped-pres-list"></div>
-          </div>
-
-          <div class="ped-notes" id="ped-notes"></div>
-
-          <button class="btn-copy-ped" onclick="copyPedResult()">
-            <span>⎘</span> Copiar resultado
-          </button>
-          <div class="copy-feedback" id="ped-copy-feedback">✓ Copiado!</div>
-        </div>
-
-        <div id="ped-placeholder" class="ped-placeholder">
-          <div class="ped-placeholder-icon">⚖️</div>
-          <p>Insira o peso e selecione o medicamento para calcular a dose</p>
-        </div>
-      </div>
-
-      <!-- PRESCRIÇÕES PEDIÁTRICAS -->
-      <div id="ped-rx" class="ped-tab-content">
-        <div class="search-wrap" style="padding:0 0 16px">
-          <input type="text" id="ped-search" placeholder="Buscar diagnóstico pediátrico..." oninput="filterPedDiseases()" />
-        </div>
-        <div class="disease-list" id="ped-disease-list"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- INTUBAÇÃO SCREEN -->
-  <div id="screen-intubacao" class="screen">
-    <div class="bg-grid"></div>
-    <div class="top-bar">
-      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
-      <div class="sector-badge" style="background:rgba(248,113,113,0.12);border-color:#f87171;color:#f87171">🫁 Intubação</div>
-    </div>
-
-    <div class="iot-content">
-      <div class="rx-header">
-        <span class="rx-tag">CALCULADORA</span>
-        <h2 class="rx-title">Intubação Orotraqueal</h2>
-      </div>
-
-      <div class="iot-weight-card">
-        <label class="ped-label">Peso do paciente</label>
-        <div class="ped-weight-row">
-          <input type="number" id="iot-weight" min="25" max="250" step="1" value="70" oninput="calculateIntubacao()" />
-          <span class="ped-weight-unit">kg</span>
-        </div>
-      </div>
-
-      <div class="iot-warning">
-        Ferramenta auxiliar. Não substitui julgamento clínico, contexto do paciente, protocolos locais ou checagem independente.
-      </div>
-
-      <div id="iot-drug-results"></div>
-    </div>
-  </div>
-
-  <!-- SEDAÇÃO CONTÍNUA SCREEN -->
-  <div id="screen-sedacao" class="screen">
-    <div class="bg-grid"></div>
-    <div class="top-bar">
-      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
-      <div class="sector-badge" style="background:rgba(56,189,248,0.12);border-color:#38bdf8;color:#38bdf8">💧 Sedação contínua</div>
-    </div>
-
-    <div class="iot-content">
-      <div class="rx-header">
-        <span class="rx-tag">CALCULADORA</span>
-        <h2 class="rx-title">Infusão de Sedação</h2>
-      </div>
-
-      <div class="iot-weight-card">
-        <label class="ped-label">Peso do paciente</label>
-        <div class="ped-weight-row">
-          <input type="number" id="sed-weight" min="1" max="300" step="1" value="70" oninput="calculateSedacao()" />
-          <span class="ped-weight-unit">kg</span>
-        </div>
-      </div>
-
-      <div class="iot-warning">
-        Cálculo bidirecional: informe a vazão para obter dose, ou informe a dose desejada para obter vazão. Ferramenta auxiliar.
-      </div>
-
-      <div id="sed-results" class="sed-card"></div>
-    </div>
-  </div>
-
-  <!-- LOADING -->
-  <div id="loading" class="loading-overlay">
-    <div class="loading-spinner"></div>
-    <span>Carregando...</span>
-  </div>
-
-  <!-- SHORTCUT PICKER -->
-  <div id="shortcut-picker" class="shortcut-picker-overlay" onclick="closeShortcutIfBg(event)">
-    <div class="shortcut-picker-panel">
-      <div class="shortcut-picker-header">
-        <span>Inserir Bloco</span>
-        <button onclick="closeShortcutPicker()">✕</button>
-      </div>
-      <div class="shortcut-picker-list" id="shortcut-picker-list"></div>
-    </div>
-  </div>
-
-  <!-- ADMIN MODAL -->
-  <div id="admin-modal" class="modal-overlay" onclick="closeAdminIfOutside(event)">
-    <div class="modal admin-modal-panel">
-      <div class="modal-header">
-        <h3>Gerenciar Prescrições</h3>
-        <button class="modal-close" onclick="closeAdmin()">✕</button>
-      </div>
-      <div class="modal-tabs">
-        <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver</button>
-        <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
-        <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
-        <button class="tab" onclick="switchTab('tab-ped-drugs', this)">Pediatria</button>
-        <button class="tab" onclick="switchTab('tab-shortcuts', this)">/ Atalhos</button>
-      </div>
-
-      <div id="tab-list" class="tab-content active">
-        <div class="admin-filter">
-          <select id="admin-sector-filter" onchange="renderAdminList()">
-            <option value="">Todos os setores</option>
-            <option value="Sala Verde">Sala Verde</option>
-            <option value="Sala Vermelha">Sala Vermelha</option>
-            <option value="UTI">UTI</option>
-            <option value="Pediatria">Pediatria</option>
-            <option value="GO">GO</option>
-          </select>
-        </div>
-        <div class="admin-list" id="admin-list"></div>
-      </div>
-
-      <div id="tab-add" class="tab-content">
-        <form class="admin-form" onsubmit="saveNewPrescription(event)">
-          <label>Setor</label>
-          <select name="sector" required>
-            <option value="">Selecionar...</option>
-            <option value="Sala Verde">Sala Verde</option>
-            <option value="Sala Vermelha">Sala Vermelha</option>
-            <option value="UTI">UTI</option>
-            <option value="Pediatria">Pediatria</option>
-            <option value="GO">GO</option>
-          </select>
-          <label>Nome da Doença / Diagnóstico</label>
-          <input type="text" name="disease" placeholder="ex: Pneumonia" required />
-          <label>Variantes da Prescrição</label>
-          <div id="new-variants-container"></div>
-          <button type="button" class="btn-add-variant" onclick="addNewVariantField()">+ Adicionar Variante</button>
-          <button type="submit" class="btn-save">Salvar Prescrição</button>
-        </form>
-      </div>
-
-      <div id="tab-edit" class="tab-content">
-        <form class="admin-form" onsubmit="updatePrescription(event)">
-          <input type="hidden" id="edit-id" />
-          <label>Setor</label>
-          <select id="edit-sector" required>
-            <option value="Sala Verde">Sala Verde</option>
-            <option value="Sala Vermelha">Sala Vermelha</option>
-            <option value="UTI">UTI</option>
-            <option value="Pediatria">Pediatria</option>
-            <option value="GO">GO</option>
-          </select>
-          <label>Nome da Doença / Diagnóstico</label>
-          <input type="text" id="edit-disease" required />
-          <label>Variantes da Prescrição</label>
-          <div id="variants-container"></div>
-          <button type="button" class="btn-add-variant" onclick="addVariantField()">+ Adicionar Variante</button>
-          <div style="display:flex;gap:12px;margin-top:8px">
-            <button type="submit" class="btn-save">Atualizar</button>
-            <button type="button" class="btn-delete" onclick="deletePrescription()">Excluir</button>
-          </div>
-        </form>
-      </div>
-
-      <div id="tab-shortcuts" class="tab-content">
-        <div class="shortcuts-header">
-          <p class="shortcuts-tip">Clique em <strong>⊕ Inserir Bloco</strong> ao editar uma prescrição para inserir rapidamente.</p>
-        </div>
-        <div class="admin-list" id="shortcuts-list"></div>
-        <button class="btn-add-variant" style="margin:12px 20px;width:calc(100% - 40px)" onclick="openNewShortcut()">+ Novo Atalho</button>
-      </div>
-
-      <div id="tab-ped-drugs" class="tab-content">
-        <div class="ped-admin-layout">
-          <div class="ped-admin-list-panel">
-            <div class="ped-admin-head">
-              <span>Medicamentos</span>
-              <button type="button" class="btn-edit-item" onclick="newPedDrug()">+ Novo</button>
-            </div>
-            <div id="ped-drug-admin-list" class="ped-drug-admin-list"></div>
-          </div>
-
-          <form class="admin-form ped-admin-form" onsubmit="savePedDrug(event)">
-            <input type="hidden" id="ped-admin-original-id" />
-
-            <label>Nome do medicamento</label>
-            <input type="text" id="ped-admin-name" placeholder="ex: Cefalexina" required />
-
-            <label>Código do marcador</label>
-            <input type="text" id="ped-admin-id" placeholder="ex: cefalexina" required />
-            <p class="field-help">Use apenas letras, números e underline. Ex: cefalexina vira {{cefalexina_ml}}.</p>
-
-            <div class="form-grid-2">
-              <div>
-                <label>Categoria</label>
-                <input type="text" id="ped-admin-category" placeholder="Antibiótico" />
-              </div>
-              <div>
-                <label>Via</label>
-                <input type="text" id="ped-admin-route" placeholder="VO" />
-              </div>
-            </div>
-
-            <div class="form-grid-2">
-              <div>
-                <label>Doses por dia</label>
-                <select id="ped-admin-doses-per-day">
-                  <option value="1">1x ao dia</option>
-                  <option value="2">2x ao dia</option>
-                  <option value="3">3x ao dia</option>
-                  <option value="4">4x ao dia</option>
-                </select>
-              </div>
-            </div>
-
-            <label>Intervalo</label>
-            <input type="text" id="ped-admin-interval" placeholder="a cada 6 horas" />
-
-            <label>Observações</label>
-            <textarea id="ped-admin-notes" rows="3" placeholder="Orientações, dose usual, cuidados..."></textarea>
-
-            <div class="ped-admin-head">
-              <span>Apresentações</span>
-              <button type="button" class="btn-edit-item" onclick="addPedPresentationField()">+ Adicionar</button>
-            </div>
-            <div id="ped-presentations-admin"></div>
-
-            <div class="ped-marker-preview">
-              <span>Marcadores deste medicamento: use _dose na receita e _mg apenas se quiser ver miligramas</span>
-              <div id="ped-marker-preview"></div>
-            </div>
-
-            <div style="display:flex;gap:12px;margin-top:8px">
-              <button type="submit" class="btn-save">Salvar Medicamento</button>
-              <button type="button" class="btn-delete" id="ped-admin-delete" onclick="deletePedDrug()" style="display:none">Excluir</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SHORTCUT EDIT MODAL -->
-  <div id="shortcut-modal" class="modal-overlay" onclick="closeShortcutModalIfBg(event)">
-    <div class="modal" style="max-width:500px">
-      <div class="modal-header">
-        <h3 id="shortcut-modal-title">Novo Atalho</h3>
-        <button class="modal-close" onclick="closeShortcutModal()">✕</button>
-      </div>
-      <form class="admin-form" onsubmit="saveShortcut(event)">
-        <input type="hidden" id="shortcut-edit-id" />
-        <label>Nome do Atalho</label>
-        <input type="text" id="shortcut-label" placeholder="ex: 💊 Analgesia" required />
-        <label>Texto Expandido</label>
-        <textarea id="shortcut-text" rows="9" placeholder="Texto que será inserido..." required></textarea>
-        <div style="display:flex;gap:12px">
-          <button type="submit" class="btn-save">Salvar</button>
-          <button type="button" class="btn-delete" id="shortcut-delete-btn" onclick="deleteShortcut()" style="display:none">Excluir</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <script src="shortcuts.js?v=20260530-3"></script>
-  <script src="pediatria.js?v=20260530-3"></script>
-  <script src="db.js?v=20260530-3"></script>
-  <script src="app.js?v=20260530-3"></script>
-</body>
-</html>
+</div>
