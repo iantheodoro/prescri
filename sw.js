@@ -2,7 +2,7 @@
 //  sw.js — Service Worker — PrescriçõesMed
 // ============================================================
 
-const CACHE_NAME = "rxmed-v4";
+const CACHE_NAME = "rxmed-v31050931";
 
 const STATIC_ASSETS = [
   "/prescri/index.html",
