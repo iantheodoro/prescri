@@ -786,164 +786,93 @@ function calculateIntubacao() {
 
 function openSedacao() {
   showScreen("screen-sedacao");
+  renderSedacao();
+}
+
+function renderSedacao() {
+  const target = document.getElementById("sed-results");
+  if (!target) return;
+
+  target.innerHTML = SEDATION_INFUSIONS.map(drug => `
+    <article class="sed-drug-card">
+      <div class="sed-card-top">
+        <div class="sed-kicker">${drug.className}</div>
+        <h3 class="sed-title">${drug.name}</h3>
+        <p class="sed-range-line">${drug.rangeLine}</p>
+        ${drug.subtitle ? `<p class="sed-subtitle">${drug.subtitle}</p>` : ""}
+      </div>
+
+      <div class="sed-presentation-block">
+        <div class="sed-section-label">${drug.presentationTitle}</div>
+        <select id="${drug.id}-presentation" class="sed-select" onchange="calculateSedacao()">
+          ${drug.presentations.map((p, idx) => `
+            <option value="${idx}" ${idx === 0 ? "selected" : ""}>${p.label}</option>
+          `).join("")}
+        </select>
+        <div class="sed-presentation-note" id="${drug.id}-presentation-note">${drug.presentations[0].helper}</div>
+      </div>
+
+      <div class="sed-calc-stack">
+        <div class="sed-calc-card">
+          <div class="sed-calc-head">DOSE → VAZÃO</div>
+          <div class="sed-calc-line">
+            <input type="number" id="${drug.id}-dose" min="0" step="0.01" placeholder="${drug.doseUnit}" oninput="calculateSedacao()" />
+            <span class="sed-unit">${drug.doseUnit}</span>
+            <span class="sed-arrow">→</span>
+            <strong id="${drug.id}-flow-result">—</strong>
+            <span class="sed-unit">mL/h</span>
+          </div>
+        </div>
+
+        <div class="sed-calc-card">
+          <div class="sed-calc-head">VAZÃO → DOSE</div>
+          <div class="sed-calc-line">
+            <input type="number" id="${drug.id}-flow" min="0" step="0.01" placeholder="mL/h" oninput="calculateSedacao()" />
+            <span class="sed-unit">mL/h</span>
+            <span class="sed-arrow">→</span>
+            <strong id="${drug.id}-dose-result">—</strong>
+            <span class="sed-unit">${drug.doseUnit}</span>
+          </div>
+        </div>
+      </div>
+    </article>
+  `).join("");
+
   calculateSedacao();
 }
+
 function calculateSedacao() {
-  const w = parseLocaleNumber(document.getElementById("sed-weight")?.value);
-  const container = document.getElementById("sed-results");
-  if (!container) return;
+  const weight = parseLocaleNumber(document.getElementById("sed-weight")?.value);
+  const weightValid = Number.isFinite(weight) && weight > 0;
 
-  if (!w || w <= 0) {
-    container.innerHTML = `
-      <div class="sed-card">
-        <div class="empty-state">Informe o peso para liberar a calculadora de infusão.</div>
-      </div>
-    `;
-    return;
-  }
+  SEDATION_INFUSIONS.forEach(drug => {
+    const presentationSelect = document.getElementById(`${drug.id}-presentation`);
+    const flowInput = document.getElementById(`${drug.id}-flow`);
+    const doseInput = document.getElementById(`${drug.id}-dose`);
+    const doseResult = document.getElementById(`${drug.id}-dose-result`);
+    const flowResult = document.getElementById(`${drug.id}-flow-result`);
+    const note = document.getElementById(`${drug.id}-presentation-note`);
+    if (!presentationSelect || !flowInput || !doseInput || !doseResult || !flowResult || !note) return;
 
-  const state = {
-    fentanilMl: parseLocaleNumber(document.getElementById("sed-fentanil")?.value) || 2,
-    midazMl: parseLocaleNumber(document.getElementById("sed-midazolam")?.value) || 1,
-    vazao: parseLocaleNumber(document.getElementById("sed-vazao")?.value) || 10
-  };
+    const selectedIndex = Number(presentationSelect.value) || 0;
+    const presentation = drug.presentations[selectedIndex] || drug.presentations[0];
+    const concentration = presentation.concentration;
+    const factor = drug.doseUnit.includes("/min") ? 60 : 1;
 
-  const mixTotalVol = 100 + state.fentanilMl + state.midazMl;
-  const fentanilMcgTotal = state.fentanilMl * 50;
-  const midazMgTotal = state.midazMl * 5;
-  const fentanilMcgKgMin = ((state.vazao * (fentanilMcgTotal / mixTotalVol)) / w) / 60;
-  const midazMgKgH = (state.vazao * (midazMgTotal / mixTotalVol)) / w;
+    const flow = parseLocaleNumber(flowInput.value);
+    const desiredDose = parseLocaleNumber(doseInput.value);
 
-  const infusionCards = [
-    {
-      id: "midazolam",
-      name: "Midazolam",
-      className: "Sedativo benzodiazepínico",
-      accent: "#3b82f6",
-      accentSoft: "rgba(59,130,246,0.12)",
-      target: "0,02-0,1 mg/kg/h",
-      solution: "Ampola 5 mg/mL",
-      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.02, 2)} a ${formatNumber(w * 0.1, 2)} mg/h`
-    },
-    {
-      id: "fentanil",
-      name: "Fentanil",
-      className: "Opioide",
-      accent: "#14b8a6",
-      accentSoft: "rgba(20,184,166,0.12)",
-      target: "0,5-5 mcg/kg/h",
-      solution: "Ampola 50 mcg/mL",
-      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.5, 1)} a ${formatNumber(w * 5, 1)} mcg/h`
-    },
-    {
-      id: "propofol",
-      name: "Propofol",
-      className: "Hipnótico",
-      accent: "#ec4899",
-      accentSoft: "rgba(236,72,153,0.12)",
-      target: "5-50 mcg/kg/min",
-      solution: "Ampola 10 mg/mL",
-      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber((w * 5) / 60, 2)} a ${formatNumber((w * 50) / 60, 2)} mg/h`
-    },
-    {
-      id: "cetamina",
-      name: "Cetamina",
-      className: "Analgosedação",
-      accent: "#f59e0b",
-      accentSoft: "rgba(245,158,11,0.12)",
-      target: "0,5-2 mg/kg/h",
-      solution: "Ampola 10 mg/mL",
-      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.5, 2)} a ${formatNumber(w * 2, 2)} mg/h`
-    },
-    {
-      id: "dexmedetomidina",
-      name: "Dexmedetomidina",
-      className: "Sedativo alfa-2",
-      accent: "#8b5cf6",
-      accentSoft: "rgba(139,92,246,0.12)",
-      target: "0,2-1,5 mcg/kg/h",
-      solution: "Solução 4 mcg/mL",
-      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.2, 1)} a ${formatNumber(w * 1.5, 1)} mcg/h`
-    },
-    {
-      id: "noradrenalina",
-      name: "Noradrenalina",
-      className: "Vasopressor",
-      accent: "#ef4444",
-      accentSoft: "rgba(239,68,68,0.12)",
-      target: "0,02-1 mcg/kg/min",
-      solution: "Ex.: 4 mg/50 mL",
-      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.02, 2)} a ${formatNumber(w, 1)} mcg/min`
-    }
-  ];
+    const calculatedDose = weightValid && Number.isFinite(flow) && flow > 0
+      ? (flow * concentration) / (weight * factor)
+      : NaN;
+    const calculatedFlow = weightValid && Number.isFinite(desiredDose) && desiredDose > 0
+      ? (desiredDose * weight * factor) / concentration
+      : NaN;
 
-  container.innerHTML = `
-    <div class="sed-card">
-      <div class="sed-infusion-card">
-        <div class="sed-targets">
-          <strong>Fentanil + Midazolam</strong>
-          <span>Concentrações usuais</span>
-          <span>Fentanil: 50 mcg/mL</span>
-          <span>Midazolam: 5 mg/mL</span>
-        </div>
-        <div class="sed-dilution">
-          <span>Preparação de referência</span>
-          <strong>100 mL de volume final</strong>
-          <em>O cálculo abaixo estima a dose resultante da bomba pela composição da mistura.</em>
-        </div>
-        <div class="sed-calc-grid">
-          <div class="sed-calc-panel">
-            <div class="sed-calc-row">
-              <input id="sed-fentanil" type="number" min="0" step="0.1" value="${state.fentanilMl}" oninput="calculateSedacao()" />
-              <span>mL de fentanil</span>
-              <strong>${formatNumber(fentanilMcgTotal, 0)}</strong>
-              <span>mcg totais</span>
-            </div>
-          </div>
-          <div class="sed-calc-panel">
-            <div class="sed-calc-row">
-              <input id="sed-midazolam" type="number" min="0" step="0.1" value="${state.midazMl}" oninput="calculateSedacao()" />
-              <span>mL de midazolam</span>
-              <strong>${formatNumber(midazMgTotal, 1)}</strong>
-              <span>mg totais</span>
-            </div>
-          </div>
-          <div class="sed-calc-panel">
-            <div class="sed-calc-row">
-              <input id="sed-vazao" type="number" min="0.1" step="0.1" value="${state.vazao}" oninput="calculateSedacao()" />
-              <span>mL/h na bomba</span>
-              <strong>${formatNumber(fentanilMcgKgMin, 2)}</strong>
-              <span>mcg/kg/min</span>
-            </div>
-            <div class="sed-range-badge light" id="sed-range-label">Midazolam: ${formatNumber(midazMgKgH, 2)} mg/kg/h</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sed-section">
-        <div class="iot-section-head" style="margin-top:18px">
-          <span class="iot-dot" style="background:#38bdf8"></span>
-          <span>Infusões contínuas comuns</span>
-          <span class="iot-line"></span>
-        </div>
-        <div class="iot-grid">
-          ${infusionCards.map(drug => `
-            <article class="iot-drug-card" style="--iot-accent:${drug.accent}; --iot-accent-soft:${drug.accentSoft}">
-              <div class="iot-drug-name">${drug.name}</div>
-              <div class="iot-drug-class">${drug.className}</div>
-              <div class="iot-dose-row">
-                <div class="iot-dose-label">Faixa usual</div>
-                <div class="iot-dose-value">${drug.target}</div>
-                <div class="iot-dose-unit"></div>
-                <div class="iot-dose-ref">${drug.solution}</div>
-              </div>
-              <div class="iot-drug-note">${drug.extra}</div>
-            </article>
-          `).join("")}
-        </div>
-      </div>
-    </div>
-  `;
+    doseResult.textContent = Number.isFinite(calculatedDose) ? formatNumber(calculatedDose, 2) : "—";
+    flowResult.textContent = Number.isFinite(calculatedFlow) ? formatNumber(calculatedFlow, 1) : "—";
+    note.textContent = presentation.helper;
+  });
 }
 // ── Exportação Amarrada para o Escopo Global ──────────────
 Object.assign(window, {
