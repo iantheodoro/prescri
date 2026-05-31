@@ -1,5 +1,5 @@
 // ============================================================
-//  app.js
+//  app.js — Core & Navegação Integrada do PrescriçõesMed
 // ============================================================
 
 let currentSector = "";
@@ -42,10 +42,12 @@ async function renderDiseaseList(filter = "") {
       seen.add(key);
       return true;
     });
+
     if (!items.length) {
-      list.innerHTML = `<div class="empty-state">Nenhuma prescrição encontrada.<br/>Use ⚙ para adicionar.</div>`;
+      list.innerHTML = `<div class="empty-state">Nenhum diagnóstico neste setor.<br/>Use o botão ⚙ administrativo para cadastrar.</div>`;
       return;
     }
+
     list.innerHTML = items.map(p => `
       <button class="disease-item" onclick="openPrescription('${p.id}')">
         <span class="disease-arrow">→</span>
@@ -53,15 +55,18 @@ async function renderDiseaseList(filter = "") {
         ${p.variants && p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} variantes</span>` : ''}
       </button>
     `).join("");
-  } catch(e) {
-    list.innerHTML = `<div class="empty-state">Erro ao carregar.</div>`;
-  } finally { hideLoading(); }
+  } catch (e) {
+    list.innerHTML = `<div class="empty-state">Erro ao conectar ao banco. Verifique sua conexão.</div>`;
+  } finally {
+    hideLoading();
+  }
 }
 
 function filterDiseases() {
-  renderDiseaseList(document.getElementById("search-input").value);
+  renderDiseaseList(document.getElementById("disease-search").value);
 }
 
+// ── Visualização de Prescrições e Abas ────────────────────
 async function openPrescription(id) {
   showLoading();
   try {
@@ -69,1046 +74,423 @@ async function openPrescription(id) {
     if (!p) return;
     currentPrescription = p;
     currentVariantIndex = 0;
-    document.querySelector("#screen-prescription .btn-back")
-      .setAttribute("onclick", `goBack('${p.sector === "Pediatria" ? "screen-pediatria" : "screen-disease"}')`);
-    document.getElementById("rx-sector-label").textContent = p.sector;
-    document.getElementById("rx-disease-name").textContent = p.disease;
-    document.getElementById("rx-date").textContent = new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" });
-    setupPediatricPrescriptionContext(p);
+
+    document.getElementById("rx-title").textContent = p.disease;
+    
+    // Configura inputs de contexto caso seja do setor Pediatria
+    const pedCtx = document.getElementById("rx-pediatric-context");
+    if (isPediatricPrescription()) {
+      if (pedCtx) pedCtx.style.display = "block";
+      const rxWeight = document.getElementById("rx-ped-weight");
+      const rxAge = document.getElementById("rx-ped-age");
+      if (rxWeight) rxWeight.value = pediatricPrescriptionContext.weight;
+      if (rxAge) rxAge.value = pediatricPrescriptionContext.age;
+    } else {
+      if (pedCtx) pedCtx.style.display = "none";
+    }
+
     renderVariantTabs();
     renderVariantContent(0);
-    document.getElementById("btn-copy").classList.remove("copied");
-    document.getElementById("copy-feedback").classList.remove("show");
     showScreen("screen-prescription");
-  } finally { hideLoading(); }
-}
-
-function renderVariantTabs() {
-  const p = currentPrescription;
-  const el = document.getElementById("variant-tabs");
-  if (!p.variants || p.variants.length <= 1) { el.style.display = "none"; return; }
-  el.style.display = "flex";
-  el.innerHTML = p.variants.map((v, i) => `
-    <button class="variant-tab ${i===0?'active':''}" onclick="switchVariant(${i}, this)">${v.label}</button>
-  `).join("");
-}
-
-function switchVariant(i, btn) {
-  currentVariantIndex = i;
-  document.querySelectorAll(".variant-tab").forEach(t => t.classList.remove("active"));
-  btn.classList.add("active");
-  renderVariantContent(i);
-  document.getElementById("btn-copy").classList.remove("copied");
-  document.getElementById("copy-feedback").classList.remove("show");
-}
-
-function renderVariantContent(i) {
-  const p = currentPrescription;
-  const v = p.variants ? p.variants[i] : { text: p.prescription || "" };
-  document.getElementById("rx-text").textContent = renderPrescriptionText(v.text || "");
-  setRxEditMode(false);
-}
-
-function copyPrescription() {
-  if (!currentPrescription) return;
-  const v = currentPrescription.variants
-    ? currentPrescription.variants[currentVariantIndex]
-    : { text: currentPrescription.prescription || "" };
-  navigator.clipboard.writeText(renderPrescriptionText(v.text || "")).then(() => {
-    document.getElementById("btn-copy").classList.add("copied");
-    document.getElementById("copy-feedback").classList.add("show");
-    setTimeout(() => {
-      document.getElementById("btn-copy").classList.remove("copied");
-      document.getElementById("copy-feedback").classList.remove("show");
-    }, 2500);
-  });
-}
-
-function isPediatricPrescription(p = currentPrescription) {
-  return p && p.sector === "Pediatria";
-}
-
-function parseLocaleNumber(value) {
-  if (value === null || value === undefined) return NaN;
-  return parseFloat(String(value).replace(",", "."));
-}
-
-function formatPedNumber(value, digits = 1) {
-  if (!Number.isFinite(value)) return "";
-  return Number(value.toFixed(digits)).toLocaleString("pt-BR", { maximumFractionDigits: digits });
-}
-
-function formatPedDoseValue(value, unit) {
-  if (!Number.isFinite(value)) return "";
-  const rounded = unit === "gotas" ? Math.round(value) : Math.round(value * 10) / 10;
-  return `${formatPedNumber(rounded)} ${unit}`;
-}
-
-function escapeHtml(value = "") {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function normalizePedDrugId(value) {
-  return String(value || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
-
-function setupPediatricPrescriptionContext(p) {
-  const panel = document.getElementById("rx-ped-context");
-  if (!panel) return;
-
-  if (!isPediatricPrescription(p)) {
-    panel.style.display = "none";
-    return;
-  }
-
-  const calcWeight = document.getElementById("ped-weight")?.value || "";
-  const calcAge = document.getElementById("ped-age")?.value || "";
-  pediatricPrescriptionContext.weight = pediatricPrescriptionContext.weight || calcWeight;
-  pediatricPrescriptionContext.age = pediatricPrescriptionContext.age || calcAge;
-
-  document.getElementById("rx-ped-weight").value = pediatricPrescriptionContext.weight;
-  document.getElementById("rx-ped-age").value = pediatricPrescriptionContext.age;
-  panel.style.display = "flex";
-}
-
-function updatePediatricPrescriptionContext() {
-  pediatricPrescriptionContext.weight = document.getElementById("rx-ped-weight")?.value || "";
-  pediatricPrescriptionContext.age = document.getElementById("rx-ped-age")?.value || "";
-
-  const calcWeight = document.getElementById("ped-weight");
-  const calcAge = document.getElementById("ped-age");
-  if (calcWeight) calcWeight.value = pediatricPrescriptionContext.weight;
-  if (calcAge) calcAge.value = pediatricPrescriptionContext.age;
-
-  if (currentPrescription) renderVariantContent(currentVariantIndex);
-}
-
-function renderPrescriptionText(text) {
-  if (!isPediatricPrescription()) return text;
-  const markers = buildPediatricMarkerMap();
-  return text.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (match, key) => {
-    const value = markers[key.toLowerCase()];
-    return value === undefined || value === "" ? match : value;
-  });
-}
-
-function getPediatricCalculation(drug, weight, age) {
-  if (!drug) return null;
-
-  let dosePerDose;
-  let dailyDose = null;
-  let label = "";
-
-  if (drug.dose_by_age) {
-    const ageBucket = Number.isFinite(age)
-      ? age
-      : Number.isFinite(weight) ? (weight < 15 ? 5 : weight < 30 ? 8 : 14) : NaN;
-    const bucket = drug.dose_by_age.find(b => ageBucket >= b.age_min && ageBucket < b.age_max)
-      || drug.dose_by_age[drug.dose_by_age.length - 1];
-    dosePerDose = bucket.dose;
-    label = `${formatPedNumber(dosePerDose)} mg (dose fixa por faixa etária)`;
-  } else if (Number.isFinite(weight) && weight > 0 && drug.dose_type === "daily") {
-    const dosesPerDay = Number(drug.doses_per_day || 3);
-    const rawDailyDose = drug.dose_per_kg * weight;
-    dailyDose = drug.dose_max ? Math.min(rawDailyDose, drug.dose_max) : rawDailyDose;
-    dosePerDose = Math.round((dailyDose / dosesPerDay) * 10) / 10;
-    label = `${formatPedNumber(dosePerDose)} mg por dose`;
-  } else if (Number.isFinite(weight) && weight > 0 && drug.dose_per_kg) {
-    const rawDose = drug.dose_per_kg * weight;
-    dosePerDose = drug.dose_max ? Math.min(rawDose, drug.dose_max) : rawDose;
-    dosePerDose = Math.round(dosePerDose * 10) / 10;
-    label = `${formatPedNumber(dosePerDose)} mg`;
-  } else {
-    return null;
-  }
-
-  return { dosePerDose, dailyDose, label };
-}
-
-function getPresentationDose(presentation, weight, dosesPerDay = 1) {
-  if (!presentation || !Number.isFinite(weight) || weight <= 0) return "";
-  if (!presentation.calc_format || !presentation.calc_value_per_kg) return "";
-
-  const [unit, , basis] = presentation.calc_format.split("/");
-  const divisor = basis === "total" ? Number(dosesPerDay || 1) : 1;
-  const value = (Number(presentation.calc_value_per_kg) * weight) / divisor;
-  const unitLabel = unit === "gotas" ? "gotas" : unit;
-  return formatPedDoseValue(value, unitLabel);
-}
-
-function buildPediatricMarkerMap() {
-  const weight = parseLocaleNumber(pediatricPrescriptionContext.weight);
-  const age = parseLocaleNumber(pediatricPrescriptionContext.age);
-  const map = {
-    peso: Number.isFinite(weight) ? `${formatPedNumber(weight)} kg` : "",
-    peso_kg: Number.isFinite(weight) ? formatPedNumber(weight) : "",
-    idade: Number.isFinite(age) ? `${formatPedNumber(age)} anos` : "",
-    idade_anos: Number.isFinite(age) ? formatPedNumber(age) : ""
-  };
-
-  PEDIATRIC_DRUGS.forEach(drug => {
-    const calc = getPediatricCalculation(drug, weight, age);
-    map[`${drug.id}_nome`] = drug.name;
-    map[`${drug.id}_rota`] = drug.route;
-    map[`${drug.id}_intervalo`] = drug.interval;
-    map[`${drug.id}_mg`] = calc ? formatPedNumber(calc.dosePerDose) : "";
-
-    if (!calc) return;
-
-    let primaryPresentationDose = "";
-    drug.presentations.forEach(p => {
-      const directDose = getPresentationDose(p, weight, drug.doses_per_day || (drug.dose_type === "daily" ? 3 : 1));
-      if (directDose) {
-        const unit = p.calc_format.split("/")[0];
-        const key = unit === "gotas" ? "gotas" : unit.toLowerCase();
-        map[`${drug.id}_${key}`] = directDose;
-        if (!primaryPresentationDose) primaryPresentationDose = directDose;
-        return;
-      }
-
-      if (p.dose_fixed_label) {
-        map[`${drug.id}_${p.unit}`] = p.dose_fixed_label;
-        if (!primaryPresentationDose) primaryPresentationDose = p.dose_fixed_label;
-        return;
-      }
-      if (p.drop_mg) {
-        const gotas = Math.round(calc.dosePerDose / p.drop_mg);
-        const value = `${gotas} gotas`;
-        map[`${drug.id}_gotas`] = value;
-        map[`${drug.id}_gotas_num`] = String(gotas);
-        if (!primaryPresentationDose) primaryPresentationDose = value;
-        return;
-      }
-      if (p.fixed_mg) {
-        const comprimidos = calc.dosePerDose / p.fixed_mg;
-        const value = comprimidos >= 1
-          ? `${comprimidos % 1 === 0 ? comprimidos : comprimidos.toFixed(1)} comprimido(s)`
-          : `${comprimidos.toFixed(2)} comprimido`;
-        if (!map[`${drug.id}_comprimidos`]) map[`${drug.id}_comprimidos`] = value;
-        if (!primaryPresentationDose) primaryPresentationDose = value;
-        return;
-      }
-      if (p.concentration) {
-        const vol = Math.round((calc.dosePerDose / p.concentration) * 10) / 10;
-        const value = `${formatPedNumber(vol)} mL`;
-        if (!map[`${drug.id}_ml`]) map[`${drug.id}_ml`] = value;
-        if (!map[`${drug.id}_ml_num`]) map[`${drug.id}_ml_num`] = formatPedNumber(vol);
-        if (!primaryPresentationDose) primaryPresentationDose = value;
-      }
-    });
-
-    map[`${drug.id}_dose`] = primaryPresentationDose || calc.label;
-  });
-
-  return map;
-}
-
-// ── Admin visual de medicamentos pediátricos ─────────────
-function loadPedDrugsFromStorage() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(PED_DRUGS_STORAGE_KEY) || "null");
-    if (!Array.isArray(saved)) return;
-    PEDIATRIC_DRUGS.splice(0, PEDIATRIC_DRUGS.length, ...saved);
-  } catch(e) {
-    console.warn("Não foi possível carregar medicamentos pediátricos salvos.", e);
-  }
-}
-
-function persistPedDrugs() {
-  localStorage.setItem(PED_DRUGS_STORAGE_KEY, JSON.stringify(PEDIATRIC_DRUGS));
-  renderPedDrugOptions();
-}
-
-function renderPedDrugOptions() {
-  const sel = document.getElementById("ped-drug");
-  if (!sel) return;
-  const selected = sel.value;
-  sel.innerHTML = `<option value="">Selecionar medicamento...</option>`;
-  PEDIATRIC_DRUGS.forEach(d => {
-    const opt = document.createElement("option");
-    opt.value = d.id;
-    opt.textContent = `${d.name} — ${d.category || "Sem categoria"}`;
-    sel.appendChild(opt);
-  });
-  if (PEDIATRIC_DRUGS.some(d => d.id === selected)) sel.value = selected;
-}
-
-function renderPedDrugAdmin(selectedId = null) {
-  const list = document.getElementById("ped-drug-admin-list");
-  if (!list) return;
-
-  list.innerHTML = PEDIATRIC_DRUGS.map(d => `
-    <button type="button" class="ped-drug-admin-item" onclick="editPedDrug('${d.id}')">
-      <span>
-        <strong>${escapeHtml(d.name)}</strong>
-        <small>{{${escapeHtml(d.id)}_dose}}</small>
-      </span>
-      <em>${d.presentations?.length || 0} apresentação(ões)</em>
-    </button>
-  `).join("");
-
-  if (selectedId) editPedDrug(selectedId);
-  else if (!document.getElementById("ped-admin-original-id").value) newPedDrug();
-}
-
-function newPedDrug() {
-  document.getElementById("ped-admin-original-id").value = "";
-  document.getElementById("ped-admin-name").value = "";
-  document.getElementById("ped-admin-id").value = "";
-  document.getElementById("ped-admin-category").value = "";
-  document.getElementById("ped-admin-route").value = "VO";
-  document.getElementById("ped-admin-doses-per-day").value = "1";
-  document.getElementById("ped-admin-interval").value = "";
-  document.getElementById("ped-admin-notes").value = "";
-  document.getElementById("ped-admin-delete").style.display = "none";
-  document.getElementById("ped-presentations-admin").innerHTML = "";
-  addPedPresentationField();
-  updatePedMarkerPreview();
-}
-
-function editPedDrug(id) {
-  const drug = PEDIATRIC_DRUGS.find(d => d.id === id);
-  if (!drug) return;
-  document.getElementById("ped-admin-original-id").value = drug.id;
-  document.getElementById("ped-admin-name").value = drug.name || "";
-  document.getElementById("ped-admin-id").value = drug.id || "";
-  document.getElementById("ped-admin-category").value = drug.category || "";
-  document.getElementById("ped-admin-route").value = drug.route || "";
-  document.getElementById("ped-admin-doses-per-day").value = drug.doses_per_day || (drug.dose_type === "daily" ? 3 : 1);
-  document.getElementById("ped-admin-interval").value = drug.interval || "";
-  document.getElementById("ped-admin-notes").value = drug.notes || "";
-  document.getElementById("ped-admin-delete").style.display = "inline-block";
-
-  document.getElementById("ped-presentations-admin").innerHTML = "";
-  (drug.presentations && drug.presentations.length ? drug.presentations : [{}])
-    .forEach(p => addPedPresentationField(p));
-  updatePedMarkerPreview();
-}
-
-function addPedPresentationField(p = {}) {
-  const wrap = document.getElementById("ped-presentations-admin");
-  const idx = wrap.querySelectorAll(".ped-presentation-row").length;
-  const div = document.createElement("div");
-  div.className = "ped-presentation-row";
-  div.innerHTML = `
-    <input type="text" class="ped-pres-label-input" placeholder="Nome. Ex: Suspensão oral" value="${escapeHtml(p.label || "")}" />
-    <select class="ped-pres-format" onchange="updatePedMarkerPreview()">
-      <option value="gotas/kg/dose" ${p.calc_format === "gotas/kg/dose" ? "selected" : ""}>gotas/kg/dose</option>
-      <option value="gotas/kg/total" ${p.calc_format === "gotas/kg/total" ? "selected" : ""}>gotas/kg/total</option>
-      <option value="mL/kg/dose" ${p.calc_format === "mL/kg/dose" ? "selected" : ""}>mL/kg/dose</option>
-      <option value="mL/kg/total" ${p.calc_format === "mL/kg/total" ? "selected" : ""}>mL/kg/total</option>
-      <option value="mg/kg/dose" ${p.calc_format === "mg/kg/dose" ? "selected" : ""}>mg/kg/dose</option>
-      <option value="mg/kg/total" ${p.calc_format === "mg/kg/total" ? "selected" : ""}>mg/kg/total</option>
-    </select>
-    <input type="number" class="ped-pres-value-per-kg" min="0" step="0.01" placeholder="valor por kg" value="${p.calc_value_per_kg ?? ""}" />
-    ${idx > 0 ? `<button type="button" class="btn-remove-variant" onclick="removePedPresentationField(this)">x</button>` : ""}
-  `;
-  wrap.appendChild(div);
-  updatePedMarkerPreview();
-}
-
-function removePedPresentationField(btn) {
-  btn.closest(".ped-presentation-row").remove();
-  updatePedMarkerPreview();
-}
-
-function collectPedPresentations() {
-  return [...document.querySelectorAll("#ped-presentations-admin .ped-presentation-row")]
-    .map(row => {
-      const base = { label: row.querySelector(".ped-pres-label-input").value.trim() };
-      if (!base.label) return null;
-      base.calc_format = row.querySelector(".ped-pres-format").value;
-      base.calc_value_per_kg = parseLocaleNumber(row.querySelector(".ped-pres-value-per-kg").value);
-      base.unit = base.calc_format.split("/")[0];
-      Object.keys(base).forEach(key => {
-        if (Number.isNaN(base[key]) || base[key] === "") delete base[key];
-      });
-      return base;
-    })
-    .filter(Boolean);
-}
-
-function getPedAdminDrugFromForm() {
-  const id = normalizePedDrugId(document.getElementById("ped-admin-id").value);
-  return {
-    id,
-    name: document.getElementById("ped-admin-name").value.trim(),
-    category: document.getElementById("ped-admin-category").value.trim(),
-    dose_per_kg: null,
-    dose_max: null,
-    interval: document.getElementById("ped-admin-interval").value.trim(),
-    max_daily: null,
-    weight_min: 1,
-    weight_max: 100,
-    presentations: collectPedPresentations(),
-    notes: document.getElementById("ped-admin-notes").value.trim(),
-    route: document.getElementById("ped-admin-route").value.trim(),
-    dose_type: "daily",
-    doses_per_day: Number(document.getElementById("ped-admin-doses-per-day").value || 1)
-  };
-}
-
-function savePedDrug(e) {
-  e.preventDefault();
-  const originalId = document.getElementById("ped-admin-original-id").value;
-  const drug = getPedAdminDrugFromForm();
-  if (!drug.id || !drug.name) {
-    alert("Preencha nome e código do marcador.");
-    return;
-  }
-  if (!drug.presentations.length || drug.presentations.some(p => !p.calc_format || !p.calc_value_per_kg)) {
-    alert("Informe o formato e o valor por kg de cada apresentação.");
-    return;
-  }
-
-  const duplicate = PEDIATRIC_DRUGS.find(d => d.id === drug.id && d.id !== originalId);
-  if (duplicate) {
-    alert("Já existe um medicamento com esse código de marcador.");
-    return;
-  }
-
-  const index = PEDIATRIC_DRUGS.findIndex(d => d.id === originalId);
-  if (index >= 0) PEDIATRIC_DRUGS[index] = drug;
-  else PEDIATRIC_DRUGS.push(drug);
-
-  persistPedDrugs();
-  renderPedDrugAdmin(drug.id);
-  alert("Medicamento pediátrico salvo.");
-}
-
-function deletePedDrug() {
-  const id = document.getElementById("ped-admin-original-id").value;
-  if (!id || !confirm("Excluir este medicamento pediátrico?")) return;
-  const index = PEDIATRIC_DRUGS.findIndex(d => d.id === id);
-  if (index >= 0) PEDIATRIC_DRUGS.splice(index, 1);
-  persistPedDrugs();
-  newPedDrug();
-  renderPedDrugAdmin();
-}
-
-function updatePedMarkerPreview() {
-  const id = normalizePedDrugId(document.getElementById("ped-admin-id")?.value || "");
-  const el = document.getElementById("ped-marker-preview");
-  if (!el) return;
-  if (!id) {
-    el.innerHTML = `<code>{{medicamento_dose}}</code>`;
-    return;
-  }
-  const markers = [`{{${id}_dose}}`, `{{${id}_mg}}`];
-  collectPedPresentations().forEach(p => {
-    const unit = p.calc_format?.split("/")[0];
-    if (unit === "gotas") markers.push(`{{${id}_gotas}}`);
-    if (unit === "mL") markers.push(`{{${id}_ml}}`);
-    if (unit === "mg") markers.push(`{{${id}_mg}}`);
-  });
-  el.innerHTML = [...new Set(markers)].map(m => `<code onclick="navigator.clipboard.writeText('${m}')">${m}</code>`).join("");
-}
-
-// ── Admin ─────────────────────────────────────────────────
-function editCurrentPrescription() {
-  if (!currentPrescription) return;
-  const btn = document.getElementById("btn-rx-edit");
-  if (btn && btn.dataset.editing === "true") {
-    saveRxInlineEdit();
-  } else {
-    setRxEditMode(true);
-  }
-}
-
-function setRxEditMode(editing) {
-  const rxText = document.getElementById("rx-text");
-  const btn = document.getElementById("btn-rx-edit");
-  if (!btn) return;
-  if (editing) {
-    rxText.contentEditable = "true";
-    rxText.classList.add("rx-text-editing");
-    rxText.focus();
-    btn.textContent = "✓ Salvar";
-    btn.dataset.editing = "true";
-    btn.classList.add("saving");
-  } else {
-    rxText.contentEditable = "false";
-    rxText.classList.remove("rx-text-editing");
-    btn.textContent = "✎ Editar";
-    btn.dataset.editing = "false";
-    btn.classList.remove("saving");
-  }
-}
-
-async function saveRxInlineEdit() {
-  const rxText = document.getElementById("rx-text");
-  const newText = rxText.textContent;
-  const p = currentPrescription;
-  const i = currentVariantIndex;
-  try {
-    showLoading();
-    const variants = p.variants
-      ? p.variants.map((v, idx) => idx === i ? { ...v, text: newText } : v)
-      : [{ label: "Prescrição", text: newText }];
-    await window.dbUpdate(p.id, { sector: p.sector, disease: p.disease, variants });
-    currentPrescription = { ...p, variants };
-    setRxEditMode(false);
-  } catch(e) {
-    alert("Erro ao salvar. Tente novamente.");
+  } catch (e) {
+    alert("Erro ao abrir prescrição.");
   } finally {
     hideLoading();
   }
 }
 
-async function openAdmin() {
-  document.getElementById("admin-modal").classList.add("open");
-  await renderAdminList();
-}
-function closeAdmin() { document.getElementById("admin-modal").classList.remove("open"); }
-function closeAdminIfOutside(e) { if (e.target === document.getElementById("admin-modal")) closeAdmin(); }
-
-function switchTab(tabId, btn) {
-  document.querySelectorAll(".tab-content").forEach(t => t.classList.remove("active"));
-  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-  document.getElementById(tabId).classList.add("active");
-  btn.classList.add("active");
-  if (tabId === "tab-shortcuts") renderShortcutsList();
-  if (tabId === "tab-ped-drugs") renderPedDrugAdmin();
+function isPediatricPrescription() {
+  return currentPrescription && (currentSector === "Pediatria" || currentPrescription.sector === "Pediatria");
 }
 
-async function renderAdminList() {
-  const filter = document.getElementById("admin-sector-filter").value;
-  const list = document.getElementById("admin-list");
-  list.innerHTML = `<div class="empty-state">Carregando...</div>`;
+function renderVariantTabs() {
+  const container = document.getElementById("rx-tabs-container");
+  container.innerHTML = "";
+  const v = currentPrescription.variants || [];
+  if (v.length <= 1) return;
+
+  v.forEach((variant, idx) => {
+    const btn = document.createElement("button");
+    btn.className = `rx-tab ${idx === 0 ? 'active' : ''}`;
+    btn.textContent = variant.label || `Opção ${idx + 1}`;
+    btn.onclick = () => switchVariant(idx, btn);
+    container.appendChild(btn);
+  });
+}
+
+function switchVariant(idx, btn) {
+  document.querySelectorAll(".rx-tab").forEach(t => t.classList.remove("active"));
+  if (btn) btn.classList.add("active");
+  currentVariantIndex = idx;
+  renderVariantContent(idx);
+}
+
+function renderVariantContent(idx) {
+  const body = document.getElementById("rx-body");
+  const v = currentPrescription.variants && currentPrescription.variants[idx];
+  if (!v) {
+    body.innerHTML = "Nenhum texto disponível.";
+    return;
+  }
+
+  setRxEditMode(false);
+
+  let text = v.text || "";
+  if (isPediatricPrescription()) {
+    text = applyPediatricMarkers(text);
+  }
+
+  body.innerText = text;
+}
+
+function updatePediatricPrescriptionContext() {
+  const wText = document.getElementById("rx-ped-weight")?.value || "";
+  const aText = document.getElementById("rx-ped-age")?.value || "";
+  
+  pediatricPrescriptionContext.weight = wText;
+  pediatricPrescriptionContext.age = aText;
+
+  const mainWeight = document.getElementById("ped-weight");
+  const mainAge = document.getElementById("ped-age");
+  if (mainWeight) mainWeight.value = wText;
+  if (mainAge) mainAge.value = aText;
+
+  // Recalcula doses se houver uma calculadora ativa (ped-ui)
+  if (window.onPedInput) {
+    window.onPedInput();
+  }
+
+  renderVariantContent(currentVariantIndex);
+}
+
+// ── Processador de Sintaxe de Marcadores Pediátricos ──────
+function parseLocaleNumber(str) {
+  if (!str) return 0;
+  return parseFloat(str.replace(",", "."));
+}
+
+function applyPediatricMarkers(text) {
+  const weight = parseLocaleNumber(pediatricPrescriptionContext.weight);
+  const age = parseLocaleNumber(pediatricPrescriptionContext.age);
+  if (!weight || weight <= 0) return text;
+
+  const map = buildPediatricMarkerMap(weight, age);
+  let output = text;
+  for (const [marker, val] of Object.entries(map)) {
+    const regex = new RegExp(`\\{\\{\\s*${marker}\\s*\\}\\}`, "gi");
+    output = output.replace(regex, val);
+  }
+  return output;
+}
+
+function buildPediatricMarkerMap(weight, age) {
+  const map = {};
+  const list = (typeof pedDrugsGet === "function") ? pedDrugsGet() : (typeof PEDIATRIC_DRUGS !== "undefined" ? PEDIATRIC_DRUGS : []);
+  
+  list.forEach(drug => {
+    let calc = null;
+    if (typeof getPediatricCalculation === "function") {
+      calc = getPediatricCalculation(drug, weight, age);
+    } else {
+      let dPerDose = 0;
+      if (drug.dose_per_kg) {
+        dPerDose = drug.dose_per_kg * weight;
+        if (drug.dose_max && dPerDose > drug.dose_max) dPerDose = drug.dose_max;
+      } else if (drug.dose_by_age) {
+        const match = drug.dose_by_age.find(f => age >= f.age_min && age <= f.age_max);
+        if (match) dPerDose = match.dose;
+      }
+      if (dPerDose > 0) {
+        calc = { dosePerDose: dPerDose, label: `${dPerDose.toFixed(1).replace(".", ",")} mg` };
+      }
+    }
+
+    if (!calc) {
+      map[`${drug.id}_dose`] = `[Definir peso p/ ${drug.name}]`;
+      map[`${drug.id}_ml`] = `[Definir peso]`;
+      map[`${drug.id}_gotas`] = `[Definir peso]`;
+      return;
+    }
+
+    map[`${drug.id}_dose`] = calc.label;
+
+    (drug.presentations || []).forEach(p => {
+      if (p.drop_mg) {
+        const g = Math.round(calc.dosePerDose / p.drop_mg);
+        map[`${drug.id}_gotas`] = `${g} gotas`;
+      } else if (p.concentration) {
+        const ml = Math.round((calc.dosePerDose / p.concentration) * 10) / 10;
+        map[`${drug.id}_ml`] = `${ml.toString().replace(".", ",")} mL`;
+      } else if (p.fixed_mg) {
+        const comp = calc.dosePerDose / p.fixed_mg;
+        const compLabel = comp >= 1 ? `${comp % 1 === 0 ? comp : comp.toFixed(1)} comp` : `${comp.toFixed(2)} comp`;
+        map[`${drug.id}_comp`] = compLabel.replace(".", ",");
+      }
+    });
+
+    if (!map[`${drug.id}_ml`]) map[`${drug.id}_ml`] = map[`${drug.id}_dose`];
+    if (!map[`${drug.id}_gotas`]) map[`${drug.id}_gotas`] = map[`${drug.id}_dose`];
+  });
+
+  return map;
+}
+
+// ── Edição Inline (contentEditable) e Cópia ────────────────
+function setRxEditMode(mode) {
+  const body = document.getElementById("rx-body");
+  const editBtn = document.getElementById("btn-edit-rx");
+  const saveBtn = document.getElementById("btn-save-rx");
+  
+  if (mode) {
+    body.contentEditable = "true";
+    body.classList.add("editing");
+    if (editBtn) editBtn.style.display = "none";
+    if (saveBtn) saveBtn.style.display = "inline-flex";
+    if (window.openShortcutPicker) {
+      body.onfocus = () => window.openShortcutPicker(body);
+    }
+  } else {
+    body.contentEditable = "false";
+    body.classList.remove("editing");
+    if (editBtn) editBtn.style.display = "inline-flex";
+    if (saveBtn) saveBtn.style.display = "none";
+    body.onfocus = null;
+    if (window.closeShortcutPicker) window.closeShortcutPicker();
+  }
+}
+
+function editCurrentPrescription() {
+  setRxEditMode(true);
+  const v = currentPrescription.variants && currentPrescription.variants[currentVariantIndex];
+  if (v) {
+    document.getElementById("rx-body").innerText = v.text || "";
+  }
+}
+
+async function saveRxInlineEdit() {
+  if (!currentPrescription) return;
+  const newText = document.getElementById("rx-body").innerText;
+  
+  currentPrescription.variants[currentVariantIndex].text = newText;
   showLoading();
   try {
-    const all = filter ? await window.dbGetBySector(filter) : await window.dbGetAll();
-    if (!all.length) { list.innerHTML = `<div class="empty-state">Nenhuma prescrição.</div>`; return; }
-    list.innerHTML = all.map(p => `
+    await window.dbUpdate(currentPrescription.id, {
+      variants: currentPrescription.variants
+    });
+    setRxEditMode(false);
+    renderVariantContent(currentVariantIndex);
+  } catch (e) {
+    alert("Erro ao salvar alterações no servidor.");
+  } finally {
+    hideLoading();
+  }
+}
+
+function copyPrescription() {
+  const body = document.getElementById("rx-body");
+  const text = body.innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const feedback = document.getElementById("copy-feedback");
+    feedback.classList.add("show");
+    setTimeout(() => feedback.classList.remove("show"), 2000);
+  });
+}
+
+// ============================================================
+//  PAINEL ADMINISTRATIVO (Gerenciamento de Prescrições Gerais)
+// ============================================================
+
+function openAdmin() {
+  showScreen("screen-admin");
+  switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+  renderAdminList();
+}
+function closeAdmin() {
+  if (currentSector) {
+    showScreen("screen-disease");
+    renderDiseaseList();
+  } else {
+    showScreen("screen-welcome");
+  }
+}
+function closeAdminIfOutside(e) {
+  if (e.target.classList.contains("modal-overlay")) closeAdmin();
+}
+
+function switchTab(tabId, btn) {
+  document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.getElementById(tabId).classList.add("active");
+  if (btn) btn.classList.add("active");
+}
+
+async function renderAdminList(filter = "") {
+  const container = document.getElementById("admin-list-container");
+  container.innerHTML = '<div class="empty-state">Carregando...</div>';
+  try {
+    const all = (await window.dbGetAll()).sort((a, b) => {
+      const sec = a.sector.localeCompare(b.sector);
+      if (sec !== 0) return sec;
+      return a.disease.localeCompare(b.disease);
+    });
+    
+    const filtered = all.filter(x => 
+      x.disease.toLowerCase().includes(filter.toLowerCase()) || 
+      x.sector.toLowerCase().includes(filter.toLowerCase())
+    );
+
+    if (!filtered.length) {
+      container.innerHTML = '<div class="empty-state">Nenhuma prescrição cadastrada.</div>';
+      return;
+    }
+
+    container.innerHTML = filtered.map(p => `
       <div class="admin-item">
         <div class="admin-item-info">
           <span class="admin-item-sector">${p.sector}</span>
-          <span class="admin-item-disease">${p.disease}</span>
-          ${p.variants && p.variants.length > 1 ? `<span class="admin-item-variants">${p.variants.length} variantes</span>` : ''}
+          <strong class="admin-item-disease">${p.disease}</strong>
+          <span class="admin-item-vcount">${p.variants ? p.variants.length : 1} variante(s)</span>
         </div>
-        <button class="btn-edit-item" onclick="startEdit('${p.id}')">✎ Editar</button>
+        <button class="btn-edit" onclick="startEdit('${p.id}')">Editar</button>
       </div>
     `).join("");
+  } catch(e) {
+    container.innerHTML = '<div class="empty-state">Erro ao buscar lista.</div>';
+  }
+}
+
+function filterAdminList() {
+  renderAdminList(document.getElementById("admin-search").value);
+}
+
+// ── Fluxos de Inclusão e Edição Estrutural no Form ────────
+function addVariantField(containerId, label = "", text = "") {
+  const container = document.getElementById(containerId);
+  const div = document.createElement("div");
+  div.className = "variant-form-group animate-fade";
+  div.innerHTML = `
+    <div class="variant-form-header">
+      <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label" value="${label}" required />
+      <button type="button" class="btn-remove-var" onclick="this.parentElement.parentElement.remove()">✕ Remover</button>
+    </div>
+    <textarea rows="6" placeholder="Texto estruturado da prescrição..." class="var-text" required>${text}</textarea>
+  `;
+  container.appendChild(div);
+  
+  const textarea = div.querySelector(".var-text");
+  if (window.openShortcutPicker) {
+    textarea.onfocus = () => window.openShortcutPicker(textarea);
+    textarea.onblur = () => setTimeout(window.closeShortcutPicker, 200);
+  }
+}
+
+function addNewVariantField() { addVariantField("new-variants-container"); }
+function addVariantFieldEdit() { addVariantField("edit-variants-container"); }
+
+async function saveNewPrescription(e) {
+  e.preventDefault();
+  const sector = document.getElementById("new-rx-sector").value;
+  const disease = document.getElementById("new-rx-disease").value;
+  const blocks = document.querySelectorAll("#new-variants-container .variant-form-group");
+  
+  const variants = [...blocks].map(b => ({
+    label: b.querySelector(".var-label").value,
+    text: b.querySelector(".var-text").value
+  }));
+
+  if (!variants.length) {
+    alert("Adicione ao menos uma variante.");
+    return;
+  }
+
+  showLoading();
+  try {
+    await window.dbAdd({ sector, disease, variants });
+    e.target.reset();
+    document.getElementById("new-variants-container").innerHTML = "";
+    addNewVariantField();
+    alert("✓ Prescrição incluída com sucesso!");
+    switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+    renderAdminList();
+  } catch(err) {
+    alert("Erro ao salvar.");
   } finally { hideLoading(); }
 }
 
-// ── Variantes ─────────────────────────────────────────────
-function makeVariantBlock(label, text, idx, removeFn) {
-  const div = document.createElement("div");
-  div.className = "variant-edit-block";
-  div.innerHTML = `
-    <div class="variant-edit-header">
-      <input type="text" class="variant-label-input" placeholder="Nome da aba (ex: Sem Comorbidades)" value="${label.replace(/"/g,'&quot;')}" />
-      ${idx > 0 ? `<button type="button" class="btn-remove-variant" onclick="${removeFn}(${idx})">✕</button>` : ''}
-    </div>
-    <div class="textarea-wrap">
-      <button type="button" class="btn-insert-block" onclick="openShortcutPicker(this.nextElementSibling)">⊕ Inserir Bloco</button>
-      <textarea class="variant-text-input" rows="9" placeholder="Digite a prescrição aqui...">${text}</textarea>
-    </div>
-  `;
-  return div;
-}
-
-function addVariantField(label="", text="") {
-  const idx = editVariants.length;
-  editVariants.push({ label, text });
-  document.getElementById("variants-container").appendChild(makeVariantBlock(label, text, idx, "removeVariant"));
-}
-
-function removeVariant(idx) {
-  const blocks = [...document.querySelectorAll("#variants-container .variant-edit-block")];
-  editVariants = blocks.map(b => ({
-    label: b.querySelector(".variant-label-input").value,
-    text:  b.querySelector(".variant-text-input").value
-  }));
-  editVariants.splice(idx, 1);
-  document.getElementById("variants-container").innerHTML = "";
-  const saved = [...editVariants]; editVariants = [];
-  saved.forEach(v => addVariantField(v.label, v.text));
-}
-
-function addNewVariantField(label="", text="") {
-  const idx = newEditVariants.length;
-  newEditVariants.push({ label, text });
-  document.getElementById("new-variants-container").appendChild(makeVariantBlock(label, text, idx, "removeNewVariant"));
-}
-
-function removeNewVariant(idx) {
-  const blocks = [...document.querySelectorAll("#new-variants-container .variant-edit-block")];
-  newEditVariants = blocks.map(b => ({
-    label: b.querySelector(".variant-label-input").value,
-    text:  b.querySelector(".variant-text-input").value
-  }));
-  newEditVariants.splice(idx, 1);
-  document.getElementById("new-variants-container").innerHTML = "";
-  const saved = [...newEditVariants]; newEditVariants = [];
-  saved.forEach(v => addNewVariantField(v.label, v.text));
-}
-
-function collectVariants(containerId) {
-  return [...document.querySelectorAll(`#${containerId} .variant-edit-block`)].map(b => ({
-    label: b.querySelector(".variant-label-input").value,
-    text:  b.querySelector(".variant-text-input").value
-  }));
-}
-
 async function startEdit(id) {
+  editingId = id;
   showLoading();
   try {
     const p = await window.dbGetById(id);
     if (!p) return;
-    editingId = id;
-    document.getElementById("edit-id").value      = id;
-    document.getElementById("edit-sector").value  = p.sector;
-    document.getElementById("edit-disease").value = p.disease;
-    editVariants = [];
-    document.getElementById("variants-container").innerHTML = "";
-    (p.variants && p.variants.length ? p.variants : [{ label:"Prescrição", text: p.prescription||"" }])
-      .forEach(v => addVariantField(v.label, v.text));
-    document.getElementById("tab-edit-btn").style.display = "inline-block";
-    switchTab("tab-edit", document.getElementById("tab-edit-btn"));
-  } finally { hideLoading(); }
-}
-
-async function saveNewPrescription(e) {
-  e.preventDefault();
-  const form = e.target;
-  const variants = collectVariants("new-variants-container");
-  if (!variants.length || !variants[0].text) { alert("Adicione pelo menos uma prescrição."); return; }
-  showLoading();
-  try {
-    await window.dbAdd({ sector: form.sector.value, disease: form.disease.value, variants });
-    form.reset();
-    newEditVariants = [];
-    document.getElementById("new-variants-container").innerHTML = "";
-    addNewVariantField("Prescrição");
-    await renderAdminList();
-    await renderDiseaseList();
-    alert("✓ Prescrição salva!");
+    document.getElementById("edit-rx-sector").value = p.sector;
+    document.getElementById("edit-rx-disease").value = p.disease;
+    
+    const container = document.getElementById("edit-variants-container");
+    container.innerHTML = "";
+    
+    if (p.variants && p.variants.length) {
+      p.variants.forEach(v => addVariantField("edit-variants-container", v.label, v.text));
+    } else {
+      addVariantField("edit-variants-container", "Padrão", p.text || "");
+    }
+    
+    switchTab("tab-edit", null);
+  } catch(e) {
+    alert("Erro ao buscar dados.");
   } finally { hideLoading(); }
 }
 
 async function updatePrescription(e) {
   e.preventDefault();
-  const variants = collectVariants("variants-container");
+  if (!editingId) return;
+  
+  const sector = document.getElementById("edit-rx-sector").value;
+  const disease = document.getElementById("edit-rx-disease").value;
+  const blocks = document.querySelectorAll("#edit-variants-container .variant-form-group");
+  
+  const variants = [...blocks].map(b => ({
+    label: b.querySelector(".var-label").value,
+    text: b.querySelector(".var-text").value
+  }));
+
   showLoading();
   try {
-    await window.dbUpdate(editingId, {
-      sector:  document.getElementById("edit-sector").value,
-      disease: document.getElementById("edit-disease").value,
-      variants
-    });
-    await renderAdminList();
-    await renderDiseaseList();
-    document.getElementById("tab-edit-btn").style.display = "none";
-    switchTab("tab-list", document.getElementById("tab-list-btn"));
-    alert("✓ Atualizado!");
+    await window.dbUpdate(editingId, { sector, disease, variants });
+    alert("✓ Prescrição atualizada!");
+    editingId = null;
+    switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+    renderAdminList();
+  } catch(e) {
+    alert("Erro ao atualizar.");
   } finally { hideLoading(); }
 }
 
 async function deletePrescription() {
-  if (!confirm("Excluir esta prescrição?")) return;
+  if (!editingId || !confirm("Tem certeza que quer excluir permanentemente esta prescrição?")) return;
   showLoading();
   try {
     await window.dbDelete(editingId);
-    await renderAdminList();
-    await renderDiseaseList();
-    document.getElementById("tab-edit-btn").style.display = "none";
-    switchTab("tab-list", document.getElementById("tab-list-btn"));
+    alert("Prescrição excluída.");
+    editingId = null;
+    switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+    renderAdminList();
+  } catch(e) {
+    alert("Erro ao deletar.");
   } finally { hideLoading(); }
 }
 
-// ── Shortcut picker ───────────────────────────────────────
-function closeShortcutIfBg(e) {
-  if (e.target === document.getElementById("shortcut-picker")) closeShortcutPicker();
-}
-
-// ── Gerenciar atalhos ─────────────────────────────────────
-function renderShortcutsList() {
-  const list = document.getElementById("shortcuts-list");
-  const all  = shortcutsGetAll();
-  if (!all.length) { list.innerHTML = `<div class="empty-state">Nenhum atalho.</div>`; return; }
-  list.innerHTML = all.map(s => `
-    <div class="admin-item">
-      <div class="admin-item-info">
-        <span class="admin-item-disease">${s.label}</span>
-      </div>
-      <button class="btn-edit-item" onclick="openEditShortcut('${s.id}')">✎ Editar</button>
-    </div>
-  `).join("");
-}
-
-function openNewShortcut() {
-  document.getElementById("shortcut-modal-title").textContent = "Novo Atalho";
-  document.getElementById("shortcut-edit-id").value = "";
-  document.getElementById("shortcut-label").value   = "";
-  document.getElementById("shortcut-text").value    = "";
-  document.getElementById("shortcut-delete-btn").style.display = "none";
-  document.getElementById("shortcut-modal").classList.add("open");
-}
-
-function openEditShortcut(id) {
-  const s = shortcutsGetAll().find(x => x.id === id);
-  if (!s) return;
-  document.getElementById("shortcut-modal-title").textContent = "Editar Atalho";
-  document.getElementById("shortcut-edit-id").value = s.id;
-  document.getElementById("shortcut-label").value   = s.label;
-  document.getElementById("shortcut-text").value    = s.text;
-  document.getElementById("shortcut-delete-btn").style.display = "inline-block";
-  document.getElementById("shortcut-modal").classList.add("open");
-}
-
-function closeShortcutModal() { document.getElementById("shortcut-modal").classList.remove("open"); }
-function closeShortcutModalIfBg(e) { if (e.target === document.getElementById("shortcut-modal")) closeShortcutModal(); }
-
-function saveShortcut(e) {
-  e.preventDefault();
-  const id    = document.getElementById("shortcut-edit-id").value;
-  const label = document.getElementById("shortcut-label").value.trim();
-  const text  = document.getElementById("shortcut-text").value;
-  if (id) { shortcutsUpdate(id, { label, text }); }
-  else    { shortcutsAdd({ label, text }); }
-  closeShortcutModal();
-  renderShortcutsList();
-}
-
-function deleteShortcut() {
-  const id = document.getElementById("shortcut-edit-id").value;
-  if (!id || !confirm("Excluir este atalho?")) return;
-  shortcutsDelete(id);
-  closeShortcutModal();
-  renderShortcutsList();
-}
-
-// ── Init ──────────────────────────────────────────────────
-window.addEventListener("load", async () => {
-  showLoading();
-  try {
-    loadPedDrugsFromStorage();
-    renderPedDrugOptions();
-    await window.dbInit();
-    addNewVariantField("Prescrição");
-    ["ped-admin-id", "ped-admin-name"].forEach(id => {
-      document.getElementById(id)?.addEventListener("input", () => {
-        if (id === "ped-admin-name" && !document.getElementById("ped-admin-id").value) {
-          document.getElementById("ped-admin-id").value = normalizePedDrugId(document.getElementById("ped-admin-name").value);
-        }
-        updatePedMarkerPreview();
-      });
-    });
-    document.getElementById("ped-presentations-admin")?.addEventListener("input", updatePedMarkerPreview);
-  } finally { hideLoading(); }
-});
-
-Object.assign(window, {
-  selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
-  switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
-  renderAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
-  addVariantField, removeVariant, addNewVariantField, removeNewVariant,
-  closeShortcutIfBg, renderShortcutsList,
-  openNewShortcut, openEditShortcut, closeShortcutModal, closeShortcutModalIfBg,
-  saveShortcut, deleteShortcut, updatePediatricPrescriptionContext,
-  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField,
-  removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
-  openIntubacao, calculateIntubacao, openSedacao, calculateSedacao
-});
-
-// ══════════════════════════════════════════════════════════
-//  SEDAÇÃO CONTÍNUA
-// ══════════════════════════════════════════════════════════
-
-const SEDATION_INFUSIONS = [
-  {
-    id: "propofol",
-    name: "Propofol",
-    klass: "Sedativo",
-    concentration: 10,
-    concentrationLabel: "10 mg/mL",
-    dilution: "Frasco original 200 mg/20 mL - sem diluição",
-    doseUnit: "mg/kg/h",
-    flowUnit: "mL/h",
-    lightRange: "Leve: 0,3-1 mg/kg/h",
-    deepRange: "Profunda: 1-4 mg/kg/h",
-    recommendedLimit: "Limite recomendado: 4 mg/kg/h"
-  }
-];
-
-function openSedacao() {
-  showScreen("screen-sedacao");
-  renderSedacao();
-}
-
-function formatSedNumber(value, digits = 2) {
-  if (!Number.isFinite(value)) return "—";
-  return Number(value.toFixed(digits)).toLocaleString("pt-BR", { maximumFractionDigits: digits });
-}
-
-function getSedWeight() {
-  const weight = parseLocaleNumber(document.getElementById("sed-weight")?.value);
-  return Number.isFinite(weight) && weight > 0 ? weight : 0;
-}
-
-function getSedRangeClass(dose) {
-  if (!Number.isFinite(dose) || dose <= 0) return "";
-  if (dose < 0.3) return "below";
-  if (dose <= 1) return "light";
-  if (dose <= 4) return "deep";
-  return "above";
-}
-
-function getSedRangeLabel(dose) {
-  const cls = getSedRangeClass(dose);
-  if (cls === "below") return "Abaixo da faixa leve descrita";
-  if (cls === "light") return "Faixa leve";
-  if (cls === "deep") return "Faixa profunda";
-  if (cls === "above") return "Acima do limite recomendado";
-  return "";
-}
-
-function renderSedacao() {
-  const target = document.getElementById("sed-results");
-  if (!target) return;
-
-  target.innerHTML = SEDATION_INFUSIONS.map(drug => `
-    <article class="iot-drug-card sed-infusion-card" style="--iot-accent:#38bdf8">
-      <div class="iot-drug-name">${drug.name}</div>
-      <div class="iot-drug-class">${drug.klass}</div>
-      <div class="sed-targets">
-        <span>${drug.lightRange}</span>
-        <span>${drug.deepRange}</span>
-        <strong>${drug.recommendedLimit}</strong>
-      </div>
-
-      <div class="sed-dilution">
-        <span>Apresentação</span>
-        <strong>${drug.dilution}</strong>
-        <em>${drug.concentrationLabel}</em>
-      </div>
-
-      <div class="sed-calc-grid">
-        <div class="sed-calc-panel">
-          <div class="ped-pres-label">Vazão -> Dose</div>
-          <div class="sed-calc-row">
-            <input type="number" id="${drug.id}-flow" min="0" step="0.1" placeholder="mL/h" oninput="calculateSedacao()" />
-            <span>${drug.flowUnit}</span>
-            <strong id="${drug.id}-dose-result">—</strong>
-            <span>${drug.doseUnit}</span>
-          </div>
-          <div class="sed-range-badge" id="${drug.id}-range"></div>
-        </div>
-
-        <div class="sed-calc-panel">
-          <div class="ped-pres-label">Dose -> Vazão</div>
-          <div class="sed-calc-row">
-            <input type="number" id="${drug.id}-dose" min="0" step="0.1" placeholder="mg/kg/h" oninput="calculateSedacao()" />
-            <span>${drug.doseUnit}</span>
-            <strong id="${drug.id}-flow-result">—</strong>
-            <span>${drug.flowUnit}</span>
-          </div>
-        </div>
-      </div>
-    </article>
-  `).join("");
-
-  calculateSedacao();
-}
-
-function calculateSedacao() {
-  const weight = getSedWeight();
-  SEDATION_INFUSIONS.forEach(drug => {
-    const flowInput = document.getElementById(`${drug.id}-flow`);
-    const doseInput = document.getElementById(`${drug.id}-dose`);
-    const doseResult = document.getElementById(`${drug.id}-dose-result`);
-    const flowResult = document.getElementById(`${drug.id}-flow-result`);
-    const range = document.getElementById(`${drug.id}-range`);
-    if (!flowInput || !doseInput || !doseResult || !flowResult || !range) return;
-
-    const flow = parseLocaleNumber(flowInput.value);
-    const desiredDose = parseLocaleNumber(doseInput.value);
-    const calculatedDose = weight && Number.isFinite(flow) && flow > 0
-      ? (flow * drug.concentration) / weight
-      : NaN;
-    const calculatedFlow = weight && Number.isFinite(desiredDose) && desiredDose > 0
-      ? (desiredDose * weight) / drug.concentration
-      : NaN;
-
-    doseResult.textContent = formatSedNumber(calculatedDose, 2);
-    flowResult.textContent = formatSedNumber(calculatedFlow, 1);
-
-    const label = getSedRangeLabel(calculatedDose);
-    range.textContent = label;
-    range.className = `sed-range-badge ${getSedRangeClass(calculatedDose)}`;
-  });
-}
-
-// ══════════════════════════════════════════════════════════
-//  INTUBAÇÃO
-// ══════════════════════════════════════════════════════════
-
-const INTUBATION_DRUG_GROUPS = [
-  {
-    category: "Premedicação",
-    color: "#34d399",
-    drugs: [
-      {
-        name: "Fentanil",
-        klass: "Premedicação / Opioide",
-        doses: [
-          { label: "Dose mín.", value: 1, unit: "mcg", reference: "1 mcg/kg", precision: 0 },
-          { label: "Dose máx.", value: 5, unit: "mcg", reference: "5 mcg/kg", precision: 0 }
-        ],
-        note: "Apresentação: 50 mcg/mL - ampolas com 2, 5 e 10 mL. Não fazer para todos os pacientes; geralmente indicado objetivando bloqueio simpático."
-      },
-      {
-        name: "Lidocaína",
-        klass: "Premedicação",
-        doses: [
-          { label: "Dose", value: 1.5, unit: "mg", reference: "1,5 mg/kg", precision: 0 }
-        ],
-        note: "Apresentação: 1 e 2% (10 e 20 mg/mL) - ampolas com 5 e 20 mL. Medicação de exceção; não recomendada rotineiramente."
-      }
-    ]
-  },
-  {
-    category: "Indução",
-    color: "#fb7185",
-    drugs: [
-      {
-        name: "Etomidato",
-        klass: "Indução",
-        doses: [
-          { label: "Dose", value: 0.3, unit: "mg", reference: "0,3 mg/kg", precision: 0 }
-        ],
-        note: "Apresentação: 2 mg/mL - ampola com 10 mL. Escolha segura para a maioria dos pacientes."
-      },
-      {
-        name: "Propofol",
-        klass: "Indução",
-        doses: [
-          { label: "Dose mín.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 },
-          { label: "Dose máx.", value: 2.5, unit: "mg", reference: "2,5 mg/kg", precision: 0 }
-        ],
-        note: "Apresentação: 10 mg/mL - ampolas com 10, 20 e 50 mL. Mais hipotensor que o etomidato; em TCE pode reduzir PIC."
-      },
-      {
-        name: "Cetamina",
-        klass: "Indução / Dissociativo",
-        doses: [
-          { label: "Dose mín.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 },
-          { label: "Dose máx.", value: 4, unit: "mg", reference: "4 mg/kg", precision: 0 }
-        ],
-        note: "Apresentação: 50 mg/mL - ampolas com 2 e 10 mL. Indicada em broncoespasmo e choque. Cuidado em HAS grave e HIC."
-      },
-      {
-        name: "Midazolam",
-        klass: "Indução / Benzodiazepínico",
-        doses: [
-          { label: "Dose mín.", value: 0.1, unit: "mg", reference: "0,1 mg/kg", precision: 1 },
-          { label: "Dose máx.", value: 0.3, unit: "mg", reference: "0,3 mg/kg", precision: 1 }
-        ],
-        note: "Apresentação: 1 mg/mL; ampolas de 5, 50 e 100 mL. Também 5 mg/mL, ampolas de 3 e 10 mL. Mais hipotensor e com desmame mais difícil. Reversível com flumazenil."
-      }
-    ]
-  },
-  {
-    category: "Bloqueio Neuromuscular",
-    color: "#fbbf24",
-    drugs: [
-      {
-        name: "Succinilcolina",
-        klass: "Bloqueio neuromuscular / Despolarizante",
-        doses: [
-          { label: "Dose mín.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 },
-          { label: "Dose máx.", value: 1.5, unit: "mg", reference: "1,5 mg/kg", precision: 0 }
-        ],
-        note: "Apresentação: ampola com 100 mg e 10 mL de diluente. Início aproximado 45 s, duração aproximada 10 min. Contraindicada em hiperpotassemia, grandes queimados, miopatias e história de hipertermia maligna. Sem antídoto."
-      },
-      {
-        name: "Rocurônio",
-        klass: "Bloqueio neuromuscular / Não despolarizante",
-        doses: [
-          { label: "Dose mín.", value: 0.6, unit: "mg", reference: "0,6 mg/kg", precision: 0 },
-          { label: "Dose máx.", value: 1, unit: "mg", reference: "1 mg/kg", precision: 0 }
-        ],
-        note: "Apresentação: 10 mg/mL em ampolas de 5 mL. Alternativa à succinilcolina quando contraindicada. Reversível com sugamadex (16 mg/kg)."
-      }
-    ]
-  }
-];
-
-function openIntubacao() {
-  showScreen("screen-intubacao");
-  calculateIntubacao();
-}
-
-function formatIotDose(value, precision) {
-  const rounded = precision > 0 ? Number(value.toFixed(precision)) : Math.round(value);
-  return rounded.toLocaleString("pt-BR", { maximumFractionDigits: precision });
-}
-
-function renderIotDose(dose, weight) {
-  return `
-    <div class="iot-dose-row">
-      <span class="iot-dose-label">${dose.label}</span>
-      <span class="iot-dose-value">${formatIotDose(weight * dose.value, dose.precision)}</span>
-      <span class="iot-dose-unit">${dose.unit}</span>
-      <span class="iot-dose-ref">Dose de referência: ${dose.reference}</span>
-    </div>
-  `;
-}
-
-function renderIotDrug(drug, color, weight) {
-  return `
-    <article class="iot-drug-card" style="--iot-accent:${color}">
-      <div class="iot-drug-name">${drug.name}</div>
-      <div class="iot-drug-class">${drug.klass}</div>
-      ${drug.doses.map(dose => renderIotDose(dose, weight)).join("")}
-      <div class="iot-drug-note">${drug.note}</div>
-    </article>
-  `;
-}
-
-function calculateIntubacao() {
-  const input = document.getElementById("iot-weight");
-  const target = document.getElementById("iot-drug-results");
-  if (!input || !target) return;
-
-  const weight = parseLocaleNumber(input.value);
-  if (!Number.isFinite(weight) || weight <= 0) {
-    target.innerHTML = `<div class="empty-state">Informe um peso válido para calcular.</div>`;
-    return;
-  }
-
-  target.innerHTML = INTUBATION_DRUG_GROUPS.map(group => `
-    <section class="iot-section">
-      <div class="iot-section-head">
-        <span class="iot-dot" style="background:${group.color}"></span>
-        <span>${group.category}</span>
-        <span class="iot-line"></span>
-      </div>
-      <div class="iot-grid">
-        ${group.drugs.map(drug => renderIotDrug(drug, group.color, weight)).join("")}
-      </div>
-    </section>
-  `).join("");
-}
-
-// ══════════════════════════════════════════════════════════
-//  PEDIATRIA
-// ══════════════════════════════════════════════════════════
+// ============================================================
+//  PEDIATRIA (Integração e Redirecionamento de Cálculos)
+// ============================================================
 
 function openPediatria() {
   showScreen("screen-pediatria");
-  initPedCalculator();
+  if (window.initPedDrugSelect) {
+    window.initPedDrugSelect();
+  } else {
+    renderPedDrugOptions();
+  }
   renderPedDiseaseList();
 }
 
@@ -1116,14 +498,15 @@ function switchPedTab(tabId, btn) {
   document.querySelectorAll(".ped-tab-content").forEach(t => t.classList.remove("active"));
   document.querySelectorAll(".ped-tab").forEach(t => t.classList.remove("active"));
   document.getElementById(tabId).classList.add("active");
-  btn.classList.add("active");
-}
-
-function initPedCalculator() {
-  renderPedDrugOptions();
+  if (btn) btn.classList.add("active");
 }
 
 function calculateDose() {
+  if (window.onPedInput) {
+    window.onPedInput();
+    return;
+  }
+
   const weightText = document.getElementById("ped-weight").value;
   const ageText = document.getElementById("ped-age")?.value || "";
   const weight = parseLocaleNumber(weightText);
@@ -1147,66 +530,36 @@ function calculateDose() {
     return;
   }
 
-  const drug = PEDIATRIC_DRUGS.find(d => d.id === drugId);
+  const list = (typeof pedDrugsGet === "function") ? pedDrugsGet() : (typeof PEDIATRIC_DRUGS !== "undefined" ? PEDIATRIC_DRUGS : []);
+  const drug = list.find(d => d.id === drugId);
   if (!drug) return;
 
-  const calc = getPediatricCalculation(drug, weight, age);
-  const directPresentations = drug.presentations
-    .map(p => ({ presentation: p, value: getPresentationDose(p, weight, drug.doses_per_day || 1) }))
-    .filter(item => item.value);
-  if (!calc && !directPresentations.length) return;
-  const dosePerDose = calc?.dosePerDose || null;
-  const label = calc?.label || directPresentations[0].value;
+  let calc = null;
+  if (typeof getPediatricCalculation === "function") {
+    calc = getPediatricCalculation(drug, weight, age);
+  }
+  if (!calc) return;
 
-  // Preencher resultado
   document.getElementById("ped-result-drug").textContent = drug.name;
-  document.getElementById("ped-result-route").textContent = drug.route;
-  document.getElementById("ped-dose-per-kg").textContent =
-    drug.dose_per_kg ? `${drug.dose_per_kg} mg/kg` : "Definida por apresentação";
-  document.getElementById("ped-dose-calc").textContent = label;
+  document.getElementById("ped-result-route").textContent = drug.route || "VO";
+  document.getElementById("ped-dose-per-kg").textContent = drug.dose_per_kg ? `${drug.dose_per_kg} mg/kg` : "Fixa";
+  document.getElementById("ped-dose-calc").textContent = calc.label;
   document.getElementById("ped-dose-interval").textContent = drug.interval;
-  document.getElementById("ped-notes").textContent = drug.notes;
+  document.getElementById("ped-notes").textContent = drug.notes || "";
 
-  // Apresentações
   const presList = document.getElementById("ped-pres-list");
-  presList.innerHTML = drug.presentations.map(p => {
-    const directDose = getPresentationDose(p, weight, drug.doses_per_day || 1);
-    if (directDose) {
-      return `<div class="ped-pres-item">
-        <span class="ped-pres-name">${p.label}</span>
-        <span class="ped-pres-vol">${directDose}</span>
-      </div>`;
-    }
-    if (!dosePerDose) return "";
-    if (p.dose_fixed_label) {
-      return `<div class="ped-pres-item">
-        <span class="ped-pres-name">${p.label}</span>
-        <span class="ped-pres-vol">${p.dose_fixed_label}</span>
-      </div>`;
-    }
+  presList.innerHTML = (drug.presentations || []).map(p => {
     if (p.drop_mg) {
-      const gotas = Math.round(dosePerDose / p.drop_mg);
-      return `<div class="ped-pres-item">
-        <span class="ped-pres-name">${p.label}</span>
-        <span class="ped-pres-vol">${gotas} gotas</span>
-      </div>`;
+      const gotas = Math.round(calc.dosePerDose / p.drop_mg);
+      return `<div class="ped-pres-item"><span class="ped-pres-name">${p.label}</span><span class="ped-pres-vol">${gotas} gotas</span></div>`;
     }
     if (p.fixed_mg) {
-      const comprimidos = dosePerDose / p.fixed_mg;
-      const fracLabel = comprimidos >= 1
-        ? `${comprimidos % 1 === 0 ? comprimidos : comprimidos.toFixed(1)} comprimido(s)`
-        : `${(comprimidos).toFixed(2)} comprimido — atenção: fracionar`;
-      return `<div class="ped-pres-item">
-        <span class="ped-pres-name">${p.label}</span>
-        <span class="ped-pres-vol">${fracLabel}</span>
-      </div>`;
+      const comp = calc.dosePerDose / p.fixed_mg;
+      return `<div class="ped-pres-item"><span class="ped-pres-name">${p.label}</span><span class="ped-pres-vol">${comp.toFixed(1)} comp</span></div>`;
     }
     if (p.concentration) {
-      const vol = Math.round((dosePerDose / p.concentration) * 10) / 10;
-      return `<div class="ped-pres-item">
-        <span class="ped-pres-name">${p.label}</span>
-        <span class="ped-pres-vol">${vol} mL</span>
-      </div>`;
+      const vol = Math.round((calc.dosePerDose / p.concentration) * 10) / 10;
+      return `<div class="ped-pres-item"><span class="ped-pres-name">${p.label}</span><span class="ped-pres-vol">${vol} mL</span></div>`;
     }
     return "";
   }).join("");
@@ -1216,36 +569,40 @@ function calculateDose() {
 }
 
 function copyPedResult() {
+  if (window.copyPedRx) {
+    window.copyPedRx();
+    return;
+  }
   const weight = document.getElementById("ped-weight").value;
-  const age = document.getElementById("ped-age")?.value || "";
   const drugId = document.getElementById("ped-drug").value;
-  const drug = PEDIATRIC_DRUGS.find(d => d.id === drugId);
+  const list = (typeof pedDrugsGet === "function") ? pedDrugsGet() : (typeof PEDIATRIC_DRUGS !== "undefined" ? PEDIATRIC_DRUGS : []);
+  const drug = list.find(d => d.id === drugId);
   if (!drug) return;
 
   const doseCalc = document.getElementById("ped-dose-calc").textContent;
   const interval = document.getElementById("ped-dose-interval").textContent;
   const pres = [...document.querySelectorAll(".ped-pres-item")].map(el => {
-    const name = el.querySelector(".ped-pres-name").textContent;
-    const vol  = el.querySelector(".ped-pres-vol").textContent;
-    return `  • ${name}: ${vol}`;
-  }).join("\n");
+    return `  • ${el.querySelector(".ped-pres-name").textContent}: ${el.querySelector(".ped-pres-vol").textContent}`;
+  }).join("
+");
 
-  const text = `${drug.name} — Peso: ${weight} kg${age ? ` — Idade: ${age} anos` : ""}
+  const text = `${drug.name} — Peso: ${weight} kg
 Dose: ${doseCalc}
 Intervalo: ${interval}
 Apresentações:
-${pres}
-Obs: ${drug.notes}`;
-
+${pres}`;
   navigator.clipboard.writeText(text).then(() => {
     const fb = document.getElementById("ped-copy-feedback");
-    fb.classList.add("show");
-    setTimeout(() => fb.classList.remove("show"), 2500);
+    if (fb) {
+      fb.classList.add("show");
+      setTimeout(() => fb.classList.remove("show"), 2000);
+    }
   });
 }
 
 async function renderPedDiseaseList(filter = "") {
   const list = document.getElementById("ped-disease-list");
+  if (!list) return;
   list.innerHTML = `<div class="empty-state">Carregando...</div>`;
   showLoading();
   try {
@@ -1271,7 +628,7 @@ async function renderPedDiseaseList(filter = "") {
       </button>
     `).join("");
   } catch(e) {
-    list.innerHTML = `<div class="empty-state">Erro ao carregar.</div>`;
+    list.innerHTML = `<div class="empty-state">Erro ao carregar diagnósticos pediátricos.</div>`;
   } finally { hideLoading(); }
 }
 
@@ -1279,21 +636,65 @@ function filterPedDiseases() {
   renderPedDiseaseList(document.getElementById("ped-search").value);
 }
 
-window.openPediatria     = openPediatria;
-window.switchPedTab      = switchPedTab;
-window.calculateDose     = calculateDose;
-window.copyPedResult     = copyPedResult;
-window.filterPedDiseases = filterPedDiseases;
-window.updatePediatricPrescriptionContext = updatePediatricPrescriptionContext;
-window.renderPedDrugAdmin = renderPedDrugAdmin;
-window.newPedDrug = newPedDrug;
-window.editPedDrug = editPedDrug;
-window.addPedPresentationField = addPedPresentationField;
-window.removePedPresentationField = removePedPresentationField;
-window.savePedDrug = savePedDrug;
-window.deletePedDrug = deletePedDrug;
-window.updatePedMarkerPreview = updatePedMarkerPreview;
-window.openIntubacao = openIntubacao;
-window.calculateIntubacao = calculateIntubacao;
-window.openSedacao = openSedacao;
-window.calculateSedacao = calculateSedacao;
+// ── Fallback caso Admin de Fármacos Pediátricos falte ──────
+function renderPedDrugOptions() {}
+function renderPedDrugAdmin() {}
+function newPedDrug() {}
+function editPedDrug() {}
+function addPedPresentationField() {}
+function removePedPresentationField() {}
+function savePedDrug() {}
+function deletePedDrug() {}
+function updatePedMarkerPreview() {}
+
+// ============================================================
+//  CALCULADORAS DE INFUSÃO (Sala Vermelha / UTI)
+// ============================================================
+
+function openIntubacao() { showScreen("screen-intubacao"); }
+function calculateIntubacao() {
+  const w = parseLocaleNumber(document.getElementById("int-weight").value);
+  const res = document.getElementById("int-results");
+  if (!w || w <= 0) { res.style.display = "none"; return; }
+  
+  document.getElementById("calc-etomidato").textContent = `${(w * 0.3).toFixed(1).replace(".", ",")} mg (${(w * 0.15).toFixed(1).replace(".", ",")} mL)`;
+  document.getElementById("calc-propofol").textContent  = `${(w * 1.5).toFixed(1).replace(".", ",")} mg (${(w * 0.15).toFixed(1).replace(".", ",")} mL)`;
+  document.getElementById("calc-fentanil").textContent  = `${(w * 3).toFixed(0)} mcg (${((w * 3)/50).toFixed(1).replace(".", ",")} mL)`;
+  document.getElementById("calc-succi").textContent     = `${(w * 1.5).toFixed(1).replace(".", ",")} mg (${(w * 0.03).toFixed(1).replace(".", ",")} mL)`;
+  document.getElementById("calc-rocuronio").textContent = `${(w * 1.2).toFixed(1).replace(".", ",")} mg (${(w * 0.12).toFixed(1).replace(".", ",")} mL)`;
+  
+  res.style.display = "block";
+}
+
+function openSedacao() { showScreen("screen-sedacao"); }
+function calculateSedacao() {
+  const w = parseLocaleNumber(document.getElementById("sed-weight").value);
+  const fentanilMl = parseLocaleNumber(document.getElementById("sed-fentanil").value) || 0;
+  const midazMl = parseLocaleNumber(document.getElementById("sed-midazolam").value) || 0;
+  const vazao = parseLocaleNumber(document.getElementById("sed-vazao").value) || 0;
+  const label = document.getElementById("sed-range-label");
+  
+  if (!w || !vazao) { label.style.display = "none"; return; }
+  
+  const totalVol = 100 + fentanilMl + midazMl;
+  const fentanilMcgTotal = fentanilMl * 50;
+  const midazMgTotal = midazMl * 5;
+  
+  const mcgKgMin = ((vazao * (fentanilMcgTotal / totalVol)) / w) / 60;
+  const mgKgHora = (vazao * (midazMgTotal / totalVol)) / w;
+  
+  let msg = `Fentanil: ${mcgKgMin.toFixed(2).replace(".", ",")} mcg/kg/min\nMidazolam: ${mgKgHora.toFixed(2).replace(".", ",")} mg/kg/h`;
+  label.innerText = msg;
+  label.style.display = "block";
+}
+
+// ── Exportação Amarrada para o Escopo Global ──────────────
+Object.assign(window, {
+  selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
+  switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
+  renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
+  addVariantField, addNewVariantField, addVariantFieldEdit,
+  openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
+  openPediatria, switchPedTab, calculateDose, copyPedResult, filterPedDiseases, updatePediatricPrescriptionContext,
+  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview
+});
