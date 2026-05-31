@@ -688,6 +688,109 @@ function updatePedMarkerPreview() {}
 //  CALCULADORAS DE INFUSÃO (Sala Vermelha / UTI)
 // ============================================================
 
+const SEDATION_INFUSIONS = [
+  {
+    id: "midazolam",
+    name: "Midazolam",
+    className: "Sedativo benzodiazepínico",
+    rangeLine: "Manutenção: 0,02–0,1 mg/kg/h · Máx: 0,1 mg/kg/h",
+    subtitle: "Sem depressão respiratória significativa",
+    presentationTitle: "DILUIÇÃO",
+    doseUnit: "mg/kg/h",
+    presentations: [
+      {
+        label: "Padrão · 1 mg/mL",
+        concentration: 1,
+        helper: "Padrão: 100 mg/100 mL · 1 mg/mL"
+      },
+      {
+        label: "Diluída · 0,5 mg/mL",
+        concentration: 0.5,
+        helper: "Diluída: 50 mg/100 mL · 0,5 mg/mL"
+      }
+    ]
+  },
+  {
+    id: "fentanil-sed",
+    name: "Fentanil",
+    className: "Opioide",
+    rangeLine: "Analgesia contínua: 0,01–0,05 mcg/kg/min",
+    subtitle: "Titular pela escala de dor",
+    presentationTitle: "DILUIÇÃO",
+    doseUnit: "mcg/kg/min",
+    presentations: [
+      {
+        label: "Padrão · 10 mcg/mL",
+        concentration: 10,
+        helper: "Padrão: 5 amp (500 mcg/10 mL) + 40 mL SFO,9% → 50 mL · 10 mcg/mL"
+      }
+    ]
+  },
+  {
+    id: "propofol-sed",
+    name: "Propofol",
+    className: "Hipnótico",
+    rangeLine: "Leve: 0,3–1 mg/kg/h · Profunda: 1–4 mg/kg/h",
+    subtitle: "Limite recomendado: 4 mg/kg/h",
+    presentationTitle: "APRESENTAÇÃO",
+    doseUnit: "mg/kg/h",
+    presentations: [
+      {
+        label: "Sem diluição · 10 mg/mL",
+        concentration: 10,
+        helper: "Frasco original 200 mg/20 mL · sem diluição · 10 mg/mL"
+      }
+    ]
+  },
+  {
+    id: "cetamina",
+    name: "Cetamina",
+    className: "Anestésico dissociativo",
+    rangeLine: "Dose recomendada: 0,5–1 mg/kg/h",
+    presentationTitle: "DILUIÇÃO",
+    doseUnit: "mg/kg/h",
+    presentations: [
+      {
+        label: "Padrão · 2 mg/mL",
+        concentration: 2,
+        helper: "Padrão: 10 mL (50 mg/mL) + 240 mL SFO,9% → 250 mL · 2 mg/mL"
+      }
+    ]
+  },
+  {
+    id: "dexmedetomidina",
+    name: "Dexmedetomidina",
+    className: "Alfa-2 agonista",
+    rangeLine: "Manutenção: 0,2–0,7 mcg/kg/h · Máx: 1,4 mcg/kg/h",
+    subtitle: "Sem depressão respiratória significativa",
+    presentationTitle: "DILUIÇÃO",
+    doseUnit: "mcg/kg/h",
+    presentations: [
+      {
+        label: "Padrão · 4 mcg/mL",
+        concentration: 4,
+        helper: "2 amp (400 mcg/4 mL) + 96 mL SFO,9% → 100 mL · 4 mcg/mL"
+      }
+    ]
+  },
+  {
+    id: "noradrenalina",
+    name: "Noradrenalina",
+    className: "Vasopressor",
+    rangeLine: "PAM alvo: 65–75 mmHg",
+    subtitle: "Titular conforme resposta clínica",
+    presentationTitle: "DILUIÇÃO",
+    doseUnit: "mcg/kg/min",
+    presentations: [
+      {
+        label: "Padrão · 80 mcg/mL",
+        concentration: 80,
+        helper: "Padrão: 4 mg/50 mL → 80 mcg/mL"
+      }
+    ]
+  }
+];
+
 function openIntubacao() {
   showScreen("screen-intubacao");
   calculateIntubacao();
