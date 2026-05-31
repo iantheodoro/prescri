@@ -11,6 +11,20 @@ let newEditVariants = [];
 let pediatricPrescriptionContext = { weight: "", age: "" };
 const PED_DRUGS_STORAGE_KEY = "prescricoesmed_pediatric_drugs";
 
+function getEl(...ids) {
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) return el;
+  }
+  return null;
+}
+
+function formatNumber(value, decimals = 1) {
+  if (!Number.isFinite(value)) return "-";
+  const fixed = value.toFixed(decimals);
+  return fixed.replace(".", ",");
+}
+
 function showLoading() { document.getElementById("loading").classList.add("show"); }
 function hideLoading() { document.getElementById("loading").classList.remove("show"); }
 
@@ -75,10 +89,13 @@ async function openPrescription(id) {
     currentPrescription = p;
     currentVariantIndex = 0;
 
-    document.getElementById("rx-title").textContent = p.disease;
+    const titleEl = getEl("rx-disease-name", "rx-title");
+    const sectorEl = getEl("rx-sector-label");
+    if (titleEl) titleEl.textContent = p.disease;
+    if (sectorEl) sectorEl.textContent = p.sector;
     
     // Configura inputs de contexto caso seja do setor Pediatria
-    const pedCtx = document.getElementById("rx-pediatric-context");
+    const pedCtx = getEl("rx-ped-context", "rx-pediatric-context");
     if (isPediatricPrescription()) {
       if (pedCtx) pedCtx.style.display = "block";
       const rxWeight = document.getElementById("rx-ped-weight");
@@ -104,7 +121,8 @@ function isPediatricPrescription() {
 }
 
 function renderVariantTabs() {
-  const container = document.getElementById("rx-tabs-container");
+  const container = getEl("variant-tabs", "rx-tabs-container");
+  if (!container) return;
   container.innerHTML = "";
   const v = currentPrescription.variants || [];
   if (v.length <= 1) return;
@@ -126,7 +144,8 @@ function switchVariant(idx, btn) {
 }
 
 function renderVariantContent(idx) {
-  const body = document.getElementById("rx-body");
+  const body = getEl("rx-text", "rx-body");
+  if (!body) return;
   const v = currentPrescription.variants && currentPrescription.variants[idx];
   if (!v) {
     body.innerHTML = "Nenhum texto disponível.";
@@ -237,15 +256,21 @@ function buildPediatricMarkerMap(weight, age) {
 
 // ── Edição Inline (contentEditable) e Cópia ────────────────
 function setRxEditMode(mode) {
-  const body = document.getElementById("rx-body");
-  const editBtn = document.getElementById("btn-edit-rx");
-  const saveBtn = document.getElementById("btn-save-rx");
+  const body = getEl("rx-text", "rx-body");
+  const editBtn = getEl("btn-rx-edit", "btn-edit-rx");
+  const saveBtn = getEl("btn-save-rx");
+  if (!body) return;
   
   if (mode) {
     body.contentEditable = "true";
     body.classList.add("editing");
     if (editBtn) editBtn.style.display = "none";
     if (saveBtn) saveBtn.style.display = "inline-flex";
+    if (!saveBtn && editBtn) {
+      editBtn.style.display = "inline-flex";
+      editBtn.textContent = "Salvar";
+      editBtn.onclick = saveRxInlineEdit;
+    }
     if (window.openShortcutPicker) {
       body.onfocus = () => window.openShortcutPicker(body);
     }
@@ -254,6 +279,10 @@ function setRxEditMode(mode) {
     body.classList.remove("editing");
     if (editBtn) editBtn.style.display = "inline-flex";
     if (saveBtn) saveBtn.style.display = "none";
+    if (!saveBtn && editBtn) {
+      editBtn.textContent = "✎ Editar";
+      editBtn.onclick = editCurrentPrescription;
+    }
     body.onfocus = null;
     if (window.closeShortcutPicker) window.closeShortcutPicker();
   }
@@ -263,13 +292,16 @@ function editCurrentPrescription() {
   setRxEditMode(true);
   const v = currentPrescription.variants && currentPrescription.variants[currentVariantIndex];
   if (v) {
-    document.getElementById("rx-body").innerText = v.text || "";
+    const body = getEl("rx-text", "rx-body");
+    if (body) body.innerText = v.text || "";
   }
 }
 
 async function saveRxInlineEdit() {
   if (!currentPrescription) return;
-  const newText = document.getElementById("rx-body").innerText;
+  const body = getEl("rx-text", "rx-body");
+  if (!body) return;
+  const newText = body.innerText;
   
   currentPrescription.variants[currentVariantIndex].text = newText;
   showLoading();
@@ -287,7 +319,8 @@ async function saveRxInlineEdit() {
 }
 
 function copyPrescription() {
-  const body = document.getElementById("rx-body");
+  const body = getEl("rx-text", "rx-body");
+  if (!body) return;
   const text = body.innerText;
   navigator.clipboard.writeText(text).then(() => {
     const feedback = document.getElementById("copy-feedback");
@@ -325,7 +358,8 @@ function switchTab(tabId, btn) {
 }
 
 async function renderAdminList(filter = "") {
-  const container = document.getElementById("admin-list-container");
+  const container = getEl("admin-list", "admin-list-container");
+  if (!container) return;
   container.innerHTML = '<div class="empty-state">Carregando...</div>';
   try {
     const all = (await window.dbGetAll()).sort((a, b) => {
@@ -333,18 +367,22 @@ async function renderAdminList(filter = "") {
       if (sec !== 0) return sec;
       return a.disease.localeCompare(b.disease);
     });
+    const sectorFilter = document.getElementById("admin-sector-filter")?.value || "";
     
     const filtered = all.filter(x => 
-      x.disease.toLowerCase().includes(filter.toLowerCase()) || 
-      x.sector.toLowerCase().includes(filter.toLowerCase())
+      (x.disease || "").toLowerCase().includes(filter.toLowerCase()) || 
+      (x.sector || "").toLowerCase().includes(filter.toLowerCase())
     );
+    const scoped = sectorFilter
+      ? filtered.filter(x => x.sector === sectorFilter)
+      : filtered;
 
-    if (!filtered.length) {
+    if (!scoped.length) {
       container.innerHTML = '<div class="empty-state">Nenhuma prescrição cadastrada.</div>';
       return;
     }
 
-    container.innerHTML = filtered.map(p => `
+    container.innerHTML = scoped.map(p => `
       <div class="admin-item">
         <div class="admin-item-info">
           <span class="admin-item-sector">${p.sector}</span>
@@ -360,7 +398,7 @@ async function renderAdminList(filter = "") {
 }
 
 function filterAdminList() {
-  renderAdminList(document.getElementById("admin-search").value);
+  renderAdminList(document.getElementById("admin-search")?.value || "");
 }
 
 // ── Fluxos de Inclusão e Edição Estrutural no Form ────────
@@ -583,8 +621,7 @@ function copyPedResult() {
   const interval = document.getElementById("ped-dose-interval").textContent;
   const pres = [...document.querySelectorAll(".ped-pres-item")].map(el => {
     return `  • ${el.querySelector(".ped-pres-name").textContent}: ${el.querySelector(".ped-pres-vol").textContent}`;
-  }).join("
-");
+  }).join("\n");
 
   const text = `${drug.name} — Peso: ${weight} kg
 Dose: ${doseCalc}
@@ -651,43 +688,251 @@ function updatePedMarkerPreview() {}
 //  CALCULADORAS DE INFUSÃO (Sala Vermelha / UTI)
 // ============================================================
 
-function openIntubacao() { showScreen("screen-intubacao"); }
+function openIntubacao() {
+  showScreen("screen-intubacao");
+  calculateIntubacao();
+}
 function calculateIntubacao() {
-  const w = parseLocaleNumber(document.getElementById("int-weight").value);
-  const res = document.getElementById("int-results");
-  if (!w || w <= 0) { res.style.display = "none"; return; }
-  
-  document.getElementById("calc-etomidato").textContent = `${(w * 0.3).toFixed(1).replace(".", ",")} mg (${(w * 0.15).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-propofol").textContent  = `${(w * 1.5).toFixed(1).replace(".", ",")} mg (${(w * 0.15).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-fentanil").textContent  = `${(w * 3).toFixed(0)} mcg (${((w * 3)/50).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-succi").textContent     = `${(w * 1.5).toFixed(1).replace(".", ",")} mg (${(w * 0.03).toFixed(1).replace(".", ",")} mL)`;
-  document.getElementById("calc-rocuronio").textContent = `${(w * 1.2).toFixed(1).replace(".", ",")} mg (${(w * 0.12).toFixed(1).replace(".", ",")} mL)`;
-  
-  res.style.display = "block";
+  const w = parseLocaleNumber(document.getElementById("iot-weight")?.value);
+  const res = document.getElementById("iot-drug-results");
+  if (!res) return;
+
+  if (!w || w <= 0) {
+    res.innerHTML = `<div class="empty-state">Informe o peso para ver as doses de intubação.</div>`;
+    return;
+  }
+
+  const drugs = [
+    {
+      id: "etomidato",
+      name: "Etomidato",
+      className: "Hipnótico",
+      dose: { label: "Indução", value: 0.3, unit: "mg/kg" },
+      concentration: { value: 2, unit: "mg/mL" },
+      note: "Indutor com menor impacto hemodinâmico. Pode deprimir adrenal transientemente."
+    },
+    {
+      id: "propofol",
+      name: "Propofol",
+      className: "Hipnótico",
+      dose: { label: "Indução", value: 1.5, unit: "mg/kg" },
+      concentration: { value: 10, unit: "mg/mL" },
+      note: "Útil em pacientes estáveis. Pode causar hipotensão e apneia."
+    },
+    {
+      id: "fentanil",
+      name: "Fentanil",
+      className: "Opioide",
+      dose: { label: "Analgesia pré-indução", value: 3, unit: "mcg/kg" },
+      concentration: { value: 50, unit: "mcg/mL" },
+      note: "Ajuda na resposta simpática à laringoscopia."
+    },
+    {
+      id: "succinilcolina",
+      name: "Succinilcolina",
+      className: "Bloqueador neuromuscular",
+      dose: { label: "Paralisia", value: 1.5, unit: "mg/kg" },
+      concentration: { value: 20, unit: "mg/mL" },
+      note: "Evitar em hiperK, queimaduras, doenças neuromusculares e miopatias."
+    },
+    {
+      id: "rocuronio",
+      name: "Rocurônio",
+      className: "Bloqueador neuromuscular",
+      dose: { label: "Paralisia", value: 1.2, unit: "mg/kg" },
+      concentration: { value: 10, unit: "mg/mL" },
+      note: "Alternativa à succinilcolina; útil quando se deseja duração maior."
+    }
+  ];
+
+  res.innerHTML = `
+    <div class="iot-section">
+      <div class="iot-section-head">
+        <span class="iot-dot" style="background:#f87171"></span>
+        <span>Drogas de intubação</span>
+        <span class="iot-line"></span>
+      </div>
+      <div class="iot-grid">
+        ${drugs.map(drug => {
+          const totalDose = w * drug.dose.value;
+          const totalMl = totalDose / drug.concentration.value;
+          const doseLabel = drug.dose.unit === "mcg/kg"
+            ? `${formatNumber(totalDose, 0)} mcg`
+            : `${formatNumber(totalDose, 1)} mg`;
+          return `
+            <article class="iot-drug-card">
+              <div class="iot-drug-name">${drug.name}</div>
+              <div class="iot-drug-class">${drug.className}</div>
+              <div class="iot-dose-row">
+                <div class="iot-dose-label">${drug.dose.label}</div>
+                <div class="iot-dose-value">${doseLabel}</div>
+                <div class="iot-dose-unit">${drug.dose.unit}</div>
+                <div class="iot-dose-ref">Peso: ${formatNumber(w, 1)} kg</div>
+              </div>
+              <div class="iot-dose-row">
+                <div class="iot-dose-label">Volume</div>
+                <div class="iot-dose-value">${formatNumber(totalMl, 2)} mL</div>
+                <div class="iot-dose-unit">${drug.concentration.value} ${drug.concentration.unit}</div>
+                <div class="iot-dose-ref">Conversão pela concentração da ampola</div>
+              </div>
+              <div class="iot-drug-note">${drug.note}</div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
 }
 
-function openSedacao() { showScreen("screen-sedacao"); }
+function openSedacao() {
+  showScreen("screen-sedacao");
+  calculateSedacao();
+}
 function calculateSedacao() {
-  const w = parseLocaleNumber(document.getElementById("sed-weight").value);
-  const fentanilMl = parseLocaleNumber(document.getElementById("sed-fentanil").value) || 0;
-  const midazMl = parseLocaleNumber(document.getElementById("sed-midazolam").value) || 0;
-  const vazao = parseLocaleNumber(document.getElementById("sed-vazao").value) || 0;
-  const label = document.getElementById("sed-range-label");
-  
-  if (!w || !vazao) { label.style.display = "none"; return; }
-  
-  const totalVol = 100 + fentanilMl + midazMl;
-  const fentanilMcgTotal = fentanilMl * 50;
-  const midazMgTotal = midazMl * 5;
-  
-  const mcgKgMin = ((vazao * (fentanilMcgTotal / totalVol)) / w) / 60;
-  const mgKgHora = (vazao * (midazMgTotal / totalVol)) / w;
-  
-  let msg = `Fentanil: ${mcgKgMin.toFixed(2).replace(".", ",")} mcg/kg/min\nMidazolam: ${mgKgHora.toFixed(2).replace(".", ",")} mg/kg/h`;
-  label.innerText = msg;
-  label.style.display = "block";
-}
+  const w = parseLocaleNumber(document.getElementById("sed-weight")?.value);
+  const container = document.getElementById("sed-results");
+  if (!container) return;
 
+  if (!w || w <= 0) {
+    container.innerHTML = `
+      <div class="sed-card">
+        <div class="empty-state">Informe o peso para liberar a calculadora de infusão.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const state = {
+    fentanilMl: parseLocaleNumber(document.getElementById("sed-fentanil")?.value) || 2,
+    midazMl: parseLocaleNumber(document.getElementById("sed-midazolam")?.value) || 1,
+    vazao: parseLocaleNumber(document.getElementById("sed-vazao")?.value) || 10
+  };
+
+  const mixTotalVol = 100 + state.fentanilMl + state.midazMl;
+  const fentanilMcgTotal = state.fentanilMl * 50;
+  const midazMgTotal = state.midazMl * 5;
+  const fentanilMcgKgMin = ((state.vazao * (fentanilMcgTotal / mixTotalVol)) / w) / 60;
+  const midazMgKgH = (state.vazao * (midazMgTotal / mixTotalVol)) / w;
+
+  const infusionCards = [
+    {
+      id: "midazolam",
+      name: "Midazolam",
+      className: "Sedativo benzodiazepínico",
+      target: "0,02-0,1 mg/kg/h",
+      solution: "Ampola 5 mg/mL",
+      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.02, 2)} a ${formatNumber(w * 0.1, 2)} mg/h`
+    },
+    {
+      id: "fentanil",
+      name: "Fentanil",
+      className: "Opioide",
+      target: "0,5-5 mcg/kg/h",
+      solution: "Ampola 50 mcg/mL",
+      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.5, 1)} a ${formatNumber(w * 5, 1)} mcg/h`
+    },
+    {
+      id: "propofol",
+      name: "Propofol",
+      className: "Hipnótico",
+      target: "5-50 mcg/kg/min",
+      solution: "Ampola 10 mg/mL",
+      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber((w * 5) / 60, 2)} a ${formatNumber((w * 50) / 60, 2)} mg/h`
+    },
+    {
+      id: "cetamina",
+      name: "Cetamina",
+      className: "Analgosedação",
+      target: "0,5-2 mg/kg/h",
+      solution: "Ampola 10 mg/mL",
+      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.5, 2)} a ${formatNumber(w * 2, 2)} mg/h`
+    },
+    {
+      id: "dexmedetomidina",
+      name: "Dexmedetomidina",
+      className: "Sedativo alfa-2",
+      target: "0,2-1,5 mcg/kg/h",
+      solution: "Solução 4 mcg/mL",
+      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.2, 1)} a ${formatNumber(w * 1.5, 1)} mcg/h`
+    },
+    {
+      id: "noradrenalina",
+      name: "Noradrenalina",
+      className: "Vasopressor",
+      target: "0,02-1 mcg/kg/min",
+      solution: "Ex.: 4 mg/50 mL",
+      extra: `Para ${formatNumber(w, 1)} kg: ${formatNumber(w * 0.02, 2)} a ${formatNumber(w, 1)} mcg/min`
+    }
+  ];
+
+  container.innerHTML = `
+    <div class="sed-card">
+      <div class="sed-infusion-card">
+        <div class="sed-targets">
+          <strong>Fentanil + Midazolam</strong>
+          <span>Concentrações usuais</span>
+          <span>Fentanil: 50 mcg/mL</span>
+          <span>Midazolam: 5 mg/mL</span>
+        </div>
+        <div class="sed-dilution">
+          <span>Preparação de referência</span>
+          <strong>100 mL de volume final</strong>
+          <em>O cálculo abaixo estima a dose resultante da bomba pela composição da mistura.</em>
+        </div>
+        <div class="sed-calc-grid">
+          <div class="sed-calc-panel">
+            <div class="sed-calc-row">
+              <input id="sed-fentanil" type="number" min="0" step="0.1" value="${state.fentanilMl}" oninput="calculateSedacao()" />
+              <span>mL de fentanil</span>
+              <strong>${formatNumber(fentanilMcgTotal, 0)}</strong>
+              <span>mcg totais</span>
+            </div>
+          </div>
+          <div class="sed-calc-panel">
+            <div class="sed-calc-row">
+              <input id="sed-midazolam" type="number" min="0" step="0.1" value="${state.midazMl}" oninput="calculateSedacao()" />
+              <span>mL de midazolam</span>
+              <strong>${formatNumber(midazMgTotal, 1)}</strong>
+              <span>mg totais</span>
+            </div>
+          </div>
+          <div class="sed-calc-panel">
+            <div class="sed-calc-row">
+              <input id="sed-vazao" type="number" min="0.1" step="0.1" value="${state.vazao}" oninput="calculateSedacao()" />
+              <span>mL/h na bomba</span>
+              <strong>${formatNumber(fentanilMcgKgMin, 2)}</strong>
+              <span>mcg/kg/min</span>
+            </div>
+            <div class="sed-range-badge light" id="sed-range-label">Midazolam: ${formatNumber(midazMgKgH, 2)} mg/kg/h</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sed-section">
+        <div class="iot-section-head" style="margin-top:18px">
+          <span class="iot-dot" style="background:#38bdf8"></span>
+          <span>Infusões contínuas comuns</span>
+          <span class="iot-line"></span>
+        </div>
+        <div class="iot-grid">
+          ${infusionCards.map(drug => `
+            <article class="iot-drug-card">
+              <div class="iot-drug-name">${drug.name}</div>
+              <div class="iot-drug-class">${drug.className}</div>
+              <div class="iot-dose-row">
+                <div class="iot-dose-label">Faixa usual</div>
+                <div class="iot-dose-value">${drug.target}</div>
+                <div class="iot-dose-unit"></div>
+                <div class="iot-dose-ref">${drug.solution}</div>
+              </div>
+              <div class="iot-drug-note">${drug.extra}</div>
+            </article>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
 // ── Exportação Amarrada para o Escopo Global ──────────────
 Object.assign(window, {
   selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
