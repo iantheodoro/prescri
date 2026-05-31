@@ -383,26 +383,6 @@ html, body {
 
 .copy-icon { font-size: 18px; }
 
-.btn-rx-edit {
-  display: flex; align-items: center; gap: 8px;
-  background: transparent;
-  color: var(--text-muted);
-  border: 1.5px solid var(--border-hi);
-  font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 14px;
-  padding: 13px 22px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: all 0.2s;
-  letter-spacing: 0.3px;
-}
-
-.btn-rx-edit:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
 .copy-feedback {
   font-family: var(--font-mono);
   font-size: 13px;
