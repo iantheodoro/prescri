@@ -35,7 +35,6 @@ async function renderDiseaseList(filter = "") {
     const raw = (await window.dbGetBySector(currentSector))
       .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
-    // Remove duplicatas pelo nome da doença (mantém o primeiro)
     const seen = new Set();
     const items = raw.filter(p => {
       const key = p.disease.trim().toLowerCase();
@@ -107,7 +106,6 @@ function renderVariantContent(i) {
   const p = currentPrescription;
   const v = p.variants ? p.variants[i] : { text: p.prescription || "" };
   document.getElementById("rx-text").textContent = renderPrescriptionText(v.text || "");
-  // Garante modo visualização ao trocar variante
   setRxEditMode(false);
 }
 
@@ -516,6 +514,56 @@ function updatePedMarkerPreview() {
 }
 
 // ── Admin ─────────────────────────────────────────────────
+function editCurrentPrescription() {
+  if (!currentPrescription) return;
+  const btn = document.getElementById("btn-rx-edit");
+  if (btn && btn.dataset.editing === "true") {
+    saveRxInlineEdit();
+  } else {
+    setRxEditMode(true);
+  }
+}
+
+function setRxEditMode(editing) {
+  const rxText = document.getElementById("rx-text");
+  const btn = document.getElementById("btn-rx-edit");
+  if (!btn) return;
+  if (editing) {
+    rxText.contentEditable = "true";
+    rxText.classList.add("rx-text-editing");
+    rxText.focus();
+    btn.textContent = "✓ Salvar";
+    btn.dataset.editing = "true";
+    btn.classList.add("saving");
+  } else {
+    rxText.contentEditable = "false";
+    rxText.classList.remove("rx-text-editing");
+    btn.textContent = "✎ Editar";
+    btn.dataset.editing = "false";
+    btn.classList.remove("saving");
+  }
+}
+
+async function saveRxInlineEdit() {
+  const rxText = document.getElementById("rx-text");
+  const newText = rxText.textContent;
+  const p = currentPrescription;
+  const i = currentVariantIndex;
+  try {
+    showLoading();
+    const variants = p.variants
+      ? p.variants.map((v, idx) => idx === i ? { ...v, text: newText } : v)
+      : [{ label: "Prescrição", text: newText }];
+    await window.dbUpdate(p.id, { sector: p.sector, disease: p.disease, variants });
+    currentPrescription = { ...p, variants };
+    setRxEditMode(false);
+  } catch(e) {
+    alert("Erro ao salvar. Tente novamente.");
+  } finally {
+    hideLoading();
+  }
+}
+
 async function openAdmin() {
   document.getElementById("admin-modal").classList.add("open");
   await renderAdminList();
@@ -762,7 +810,7 @@ window.addEventListener("load", async () => {
 });
 
 Object.assign(window, {
-  selectSector, goBack, openPrescription, copyPrescription, filterDiseases,
+  selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, removeVariant, addNewVariantField, removeNewVariant,
@@ -1201,9 +1249,16 @@ async function renderPedDiseaseList(filter = "") {
   list.innerHTML = `<div class="empty-state">Carregando...</div>`;
   showLoading();
   try {
-    const items = (await window.dbGetBySector("Pediatria"))
+    const rawPed = (await window.dbGetBySector("Pediatria"))
       .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
+    const seenPed = new Set();
+    const items = rawPed.filter(p => {
+      const key = p.disease.trim().toLowerCase();
+      if (seenPed.has(key)) return false;
+      seenPed.add(key);
+      return true;
+    });
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
       return;
