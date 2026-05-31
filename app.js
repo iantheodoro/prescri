@@ -693,6 +693,7 @@ const SEDATION_INFUSIONS = [
     id: "midazolam",
     name: "Midazolam",
     className: "Sedativo benzodiazepínico",
+    accent: "#38bdf8",
     rangeLine: "Manutenção: 0,02–0,1 mg/kg/h · Máx: 0,1 mg/kg/h",
     subtitle: "Sem depressão respiratória significativa",
     presentationTitle: "DILUIÇÃO",
@@ -714,6 +715,7 @@ const SEDATION_INFUSIONS = [
     id: "fentanil-sed",
     name: "Fentanil",
     className: "Opioide",
+    accent: "#f59e0b",
     rangeLine: "Analgesia contínua: 0,01–0,05 mcg/kg/min",
     subtitle: "Titular pela escala de dor",
     presentationTitle: "DILUIÇÃO",
@@ -730,6 +732,7 @@ const SEDATION_INFUSIONS = [
     id: "propofol-sed",
     name: "Propofol",
     className: "Hipnótico",
+    accent: "#8b5cf6",
     rangeLine: "Leve: 0,3–1 mg/kg/h · Profunda: 1–4 mg/kg/h",
     subtitle: "Limite recomendado: 4 mg/kg/h",
     presentationTitle: "APRESENTAÇÃO",
@@ -746,6 +749,7 @@ const SEDATION_INFUSIONS = [
     id: "cetamina",
     name: "Cetamina",
     className: "Anestésico dissociativo",
+    accent: "#10b981",
     rangeLine: "Dose recomendada: 0,5–1 mg/kg/h",
     presentationTitle: "DILUIÇÃO",
     doseUnit: "mg/kg/h",
@@ -761,6 +765,7 @@ const SEDATION_INFUSIONS = [
     id: "dexmedetomidina",
     name: "Dexmedetomidina",
     className: "Alfa-2 agonista",
+    accent: "#ec4899",
     rangeLine: "Manutenção: 0,2–0,7 mcg/kg/h · Máx: 1,4 mcg/kg/h",
     subtitle: "Sem depressão respiratória significativa",
     presentationTitle: "DILUIÇÃO",
@@ -777,6 +782,7 @@ const SEDATION_INFUSIONS = [
     id: "noradrenalina",
     name: "Noradrenalina",
     className: "Vasopressor",
+    accent: "#ef4444",
     rangeLine: "PAM alvo: 65–75 mmHg",
     subtitle: "Titular conforme resposta clínica",
     presentationTitle: "DILUIÇÃO",
@@ -897,7 +903,7 @@ function renderSedacao() {
   if (!target) return;
 
   target.innerHTML = SEDATION_INFUSIONS.map(drug => `
-    <article class="sed-drug-card">
+    <article class="sed-drug-card" style="--sed-accent: ${drug.accent || "#38bdf8"}">
       <div class="sed-card-top">
         <div class="sed-kicker">${drug.className}</div>
         <h3 class="sed-title">${drug.name}</h3>
