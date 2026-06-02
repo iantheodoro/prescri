@@ -129,7 +129,7 @@ function renderVariantTabs() {
 
   v.forEach((variant, idx) => {
     const btn = document.createElement("button");
-    btn.className = `rx-tab ${idx === 0 ? 'active' : ''}`;
+    btn.className = `variant-tab ${idx === 0 ? 'active' : ''}`;
     btn.textContent = variant.label || `Opção ${idx + 1}`;
     btn.onclick = () => switchVariant(idx, btn);
     container.appendChild(btn);
@@ -137,7 +137,7 @@ function renderVariantTabs() {
 }
 
 function switchVariant(idx, btn) {
-  document.querySelectorAll(".rx-tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".variant-tab").forEach(t => t.classList.remove("active"));
   if (btn) btn.classList.add("active");
   currentVariantIndex = idx;
   renderVariantContent(idx);
@@ -334,17 +334,14 @@ function copyPrescription() {
 // ============================================================
 
 function openAdmin() {
-  showScreen("screen-admin");
-  switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+  const modal = document.getElementById("admin-modal");
+  if (modal) modal.classList.add("open");
+  switchTab("tab-list", document.getElementById("tab-list-btn"));
   renderAdminList();
 }
 function closeAdmin() {
-  if (currentSector) {
-    showScreen("screen-disease");
-    renderDiseaseList();
-  } else {
-    showScreen("screen-welcome");
-  }
+  const modal = document.getElementById("admin-modal");
+  if (modal) modal.classList.remove("open");
 }
 function closeAdminIfOutside(e) {
   if (e.target.classList.contains("modal-overlay")) closeAdmin();
@@ -448,7 +445,7 @@ async function saveNewPrescription(e) {
     document.getElementById("new-variants-container").innerHTML = "";
     addNewVariantField();
     alert("✓ Prescrição incluída com sucesso!");
-    switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+    switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(err) {
     alert("Erro ao salvar.");
@@ -497,7 +494,7 @@ async function updatePrescription(e) {
     await window.dbUpdate(editingId, { sector, disease, variants });
     alert("✓ Prescrição atualizada!");
     editingId = null;
-    switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+    switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(e) {
     alert("Erro ao atualizar.");
@@ -511,7 +508,7 @@ async function deletePrescription() {
     await window.dbDelete(editingId);
     alert("Prescrição excluída.");
     editingId = null;
-    switchTab("tab-list", document.querySelector(".tab[data-tab='tab-list']"));
+    switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(e) {
     alert("Erro ao deletar.");
