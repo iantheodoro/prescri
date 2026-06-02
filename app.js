@@ -386,7 +386,7 @@ async function renderAdminList(filter = "") {
           <strong class="admin-item-disease">${p.disease}</strong>
           <span class="admin-item-vcount">${p.variants ? p.variants.length : 1} variante(s)</span>
         </div>
-        <button class="btn-edit" onclick="startEdit('${p.id}')">Editar</button>
+        <button class="btn-edit-item" onclick="startEdit('${p.id}')">Editar</button>
       </div>
     `).join("");
   } catch(e) {
@@ -399,8 +399,9 @@ function filterAdminList() {
 }
 
 // ── Fluxos de Inclusão e Edição Estrutural no Form ────────
-function addVariantField(containerId, label = "", text = "") {
+function addVariantField(containerId = "variants-container", label = "", text = "") {
   const container = document.getElementById(containerId);
+  if (!container) return;
   const div = document.createElement("div");
   div.className = "variant-form-group animate-fade";
   div.innerHTML = `
@@ -420,12 +421,13 @@ function addVariantField(containerId, label = "", text = "") {
 }
 
 function addNewVariantField() { addVariantField("new-variants-container"); }
-function addVariantFieldEdit() { addVariantField("edit-variants-container"); }
+function addVariantFieldEdit() { addVariantField("variants-container"); }
 
 async function saveNewPrescription(e) {
   e.preventDefault();
-  const sector = document.getElementById("new-rx-sector").value;
-  const disease = document.getElementById("new-rx-disease").value;
+  const form = e.target;
+  const sector = form.querySelector('[name="sector"]')?.value || "";
+  const disease = form.querySelector('[name="disease"]')?.value || "";
   const blocks = document.querySelectorAll("#new-variants-container .variant-form-group");
   
   const variants = [...blocks].map(b => ({
@@ -458,19 +460,25 @@ async function startEdit(id) {
   try {
     const p = await window.dbGetById(id);
     if (!p) return;
-    document.getElementById("edit-rx-sector").value = p.sector;
-    document.getElementById("edit-rx-disease").value = p.disease;
+    const editId = document.getElementById("edit-id");
+    const editSector = getEl("edit-sector", "edit-rx-sector");
+    const editDisease = getEl("edit-disease", "edit-rx-disease");
+    const container = getEl("variants-container", "edit-variants-container");
+
+    if (editId) editId.value = id;
+    if (editSector) editSector.value = p.sector;
+    if (editDisease) editDisease.value = p.disease;
     
-    const container = document.getElementById("edit-variants-container");
+    if (!container) throw new Error("edit container missing");
     container.innerHTML = "";
     
     if (p.variants && p.variants.length) {
-      p.variants.forEach(v => addVariantField("edit-variants-container", v.label, v.text));
+      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text));
     } else {
-      addVariantField("edit-variants-container", "Padrão", p.text || "");
+      addVariantField("variants-container", "Padrão", p.text || "");
     }
     
-    switchTab("tab-edit", null);
+    switchTab("tab-edit", document.getElementById("tab-edit-btn"));
   } catch(e) {
     alert("Erro ao buscar dados.");
   } finally { hideLoading(); }
@@ -478,11 +486,13 @@ async function startEdit(id) {
 
 async function updatePrescription(e) {
   e.preventDefault();
-  if (!editingId) return;
+  const form = e.target;
+  const id = editingId || document.getElementById("edit-id")?.value;
+  if (!id) return;
   
-  const sector = document.getElementById("edit-rx-sector").value;
-  const disease = document.getElementById("edit-rx-disease").value;
-  const blocks = document.querySelectorAll("#edit-variants-container .variant-form-group");
+  const sector = getEl("edit-sector", "edit-rx-sector")?.value || "";
+  const disease = getEl("edit-disease", "edit-rx-disease")?.value || "";
+  const blocks = document.querySelectorAll("#variants-container .variant-form-group, #edit-variants-container .variant-form-group");
   
   const variants = [...blocks].map(b => ({
     label: b.querySelector(".var-label").value,
@@ -491,9 +501,10 @@ async function updatePrescription(e) {
 
   showLoading();
   try {
-    await window.dbUpdate(editingId, { sector, disease, variants });
+    await window.dbUpdate(id, { sector, disease, variants });
     alert("✓ Prescrição atualizada!");
     editingId = null;
+    if (document.getElementById("edit-id")) document.getElementById("edit-id").value = "";
     switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(e) {
@@ -502,12 +513,14 @@ async function updatePrescription(e) {
 }
 
 async function deletePrescription() {
-  if (!editingId || !confirm("Tem certeza que quer excluir permanentemente esta prescrição?")) return;
+  const id = editingId || document.getElementById("edit-id")?.value;
+  if (!id || !confirm("Tem certeza que quer excluir permanentemente esta prescrição?")) return;
   showLoading();
   try {
-    await window.dbDelete(editingId);
+    await window.dbDelete(id);
     alert("Prescrição excluída.");
     editingId = null;
+    if (document.getElementById("edit-id")) document.getElementById("edit-id").value = "";
     switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(e) {
