@@ -19,6 +19,15 @@ function getEl(...ids) {
   return null;
 }
 
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function formatNumber(value, decimals = 1) {
   if (!Number.isFinite(value)) return "-";
   const fixed = value.toFixed(decimals);
@@ -263,23 +272,26 @@ function setRxEditMode(mode) {
   
   if (mode) {
     body.contentEditable = "true";
+    body.spellcheck = true;
     body.classList.add("editing");
     if (editBtn) editBtn.style.display = "none";
     if (saveBtn) saveBtn.style.display = "inline-flex";
     if (!saveBtn && editBtn) {
       editBtn.style.display = "inline-flex";
-      editBtn.textContent = "Salvar";
+      editBtn.classList.add("saving");
+      editBtn.textContent = "✓ Salvar edição";
       editBtn.onclick = saveRxInlineEdit;
     }
-    if (window.openShortcutPicker) {
-      body.onfocus = () => window.openShortcutPicker(body);
-    }
+    body.onfocus = null;
+    setTimeout(() => body.focus(), 0);
   } else {
     body.contentEditable = "false";
     body.classList.remove("editing");
+    body.spellcheck = false;
     if (editBtn) editBtn.style.display = "inline-flex";
     if (saveBtn) saveBtn.style.display = "none";
     if (!saveBtn && editBtn) {
+      editBtn.classList.remove("saving");
       editBtn.textContent = "✎ Editar";
       editBtn.onclick = editCurrentPrescription;
     }
@@ -403,21 +415,15 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   const container = document.getElementById(containerId);
   if (!container) return;
   const div = document.createElement("div");
-  div.className = "variant-form-group animate-fade";
+  div.className = "variant-form-group variant-edit-block animate-fade";
   div.innerHTML = `
-    <div class="variant-form-header">
-      <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label" value="${label}" required />
-      <button type="button" class="btn-remove-var" onclick="this.parentElement.parentElement.remove()">✕ Remover</button>
+    <div class="variant-form-header variant-edit-header">
+      <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label variant-label-input" value="${escapeHtml(label)}" required />
+      <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.parentElement.parentElement.remove()">✕ Remover</button>
     </div>
-    <textarea rows="6" placeholder="Texto estruturado da prescrição..." class="var-text" required>${text}</textarea>
+    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required>${escapeHtml(text)}</textarea>
   `;
   container.appendChild(div);
-  
-  const textarea = div.querySelector(".var-text");
-  if (window.openShortcutPicker) {
-    textarea.onfocus = () => window.openShortcutPicker(textarea);
-    textarea.onblur = () => setTimeout(window.closeShortcutPicker, 200);
-  }
 }
 
 function addNewVariantField() { addVariantField("new-variants-container"); }

@@ -408,6 +408,7 @@ html, body {
   background: rgba(74,240,196,0.08);
 }
 
+.rx-text.editing,
 .rx-text-editing {
   outline: none;
   border: 1.5px solid var(--accent) !important;
@@ -417,6 +418,8 @@ html, body {
   caret-color: var(--accent);
   white-space: pre-wrap;
   cursor: text;
+  min-height: 320px;
+  box-shadow: inset 0 0 0 1px rgba(74,240,196,0.08);
 }
 
 .copy-feedback {
