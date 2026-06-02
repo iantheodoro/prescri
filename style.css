@@ -1460,8 +1460,8 @@ html, body {
 
 /* ── Sedação contínua ─────────────────────────────────── */
 .sed-card {
-  max-width: 460px;
-  width: min(100%, 460px);
+  max-width: 640px;
+  width: min(100%, 640px);
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -1469,7 +1469,15 @@ html, body {
 }
 
 #screen-sedacao .iot-content {
-  max-width: 620px;
+  max-width: 760px;
+}
+
+#screen-sedacao .rx-header,
+#screen-sedacao .iot-weight-card,
+#screen-sedacao .iot-warning {
+  width: min(100%, 640px);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .sed-infusion-card {
