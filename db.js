@@ -13,7 +13,41 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db  = firebase.firestore();
+const storage = firebase.storage();
 const COL = "prescricoes";
+const IMAGES_PATH = "prescricoes-images";
+
+// ============================================================
+//  IMAGENS — Firebase Storage (evita exceder 1MB do Firestore)
+// ============================================================
+
+// Faz upload de uma imagem (dataURL base64 ou Blob) para o Storage
+// e retorna a URL pública de download.
+async function storageUploadImage(fileOrDataUrl, filename) {
+  const ref = storage.ref().child(`${IMAGES_PATH}/${Date.now()}_${filename}`);
+  let snapshot;
+  if (typeof fileOrDataUrl === "string" && fileOrDataUrl.startsWith("data:")) {
+    snapshot = await ref.putString(fileOrDataUrl, "data_url");
+  } else {
+    snapshot = await ref.put(fileOrDataUrl);
+  }
+  return await snapshot.ref.getDownloadURL();
+}
+
+// Remove uma imagem do Storage a partir de sua URL de download.
+// Falha silenciosamente (ex: URL externa que não pertence ao Storage).
+async function storageDeleteImage(url) {
+  try {
+    if (!url || !url.includes("firebasestorage")) return;
+    const ref = storage.refFromURL(url);
+    await ref.delete();
+  } catch(e) {
+    console.warn("Não foi possível remover imagem do Storage:", e);
+  }
+}
+
+window.storageUploadImage = storageUploadImage;
+window.storageDeleteImage = storageDeleteImage;
 
 // Estrutura: cada prescrição tem "variants": [ { label, text }, ... ]
 // Se tiver só uma variante, não mostra abas

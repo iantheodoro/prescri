@@ -476,14 +476,24 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   (images || []).forEach(img => addVariantImageEntry(imgList, img));
 }
 
-// Lê arquivos selecionados, converte para base64 e adiciona à variante
+// Mapeia cada item de imagem do form ao arquivo pendente de upload
+const pendingImageFiles = new WeakMap();
+
+// Lê arquivos selecionados, gera preview local e marca para upload no Storage ao salvar
 function handleVariantImageUpload(e, input) {
   const list = input.closest(".var-images-block").querySelector(".var-images-list");
   const files = [...(e.target.files || [])];
   files.forEach(file => {
     const reader = new FileReader();
     reader.onload = () => {
-      addVariantImageEntry(list, { url: reader.result, caption: "" });
+      const item = addVariantImageEntry(list, { url: "", caption: "" });
+      const thumb = item.querySelector(".var-image-thumb");
+      const urlInput = item.querySelector(".var-image-url");
+      thumb.src = reader.result;
+      urlInput.placeholder = "Será enviada ao salvar…";
+      urlInput.readOnly = true;
+      item.classList.add("pending-upload");
+      pendingImageFiles.set(item, file);
     };
     reader.readAsDataURL(file);
   });
@@ -501,21 +511,51 @@ function addVariantImageEntry(list, img = { url: "", caption: "" }) {
   `;
   const urlInput = item.querySelector(".var-image-url");
   const thumb = item.querySelector(".var-image-thumb");
-  urlInput.addEventListener("input", () => { thumb.src = urlInput.value; });
+  urlInput.addEventListener("input", () => {
+    thumb.src = urlInput.value;
+    item.classList.remove("pending-upload");
+    pendingImageFiles.delete(item);
+    urlInput.readOnly = false;
+    urlInput.placeholder = "URL da imagem (ou envie um arquivo)";
+  });
   list.appendChild(item);
+  return item;
 }
 
 function addNewVariantField() { addVariantField("new-variants-container"); }
 function addVariantFieldEdit() { addVariantField("variants-container"); }
 
-// Lê os campos de imagem de um bloco de variante e retorna array {url, caption}
-function collectVariantImages(block) {
-  return [...block.querySelectorAll(".var-image-item")]
-    .map(item => ({
-      url: item.querySelector(".var-image-url").value.trim(),
-      caption: item.querySelector(".var-image-caption").value.trim()
-    }))
-    .filter(img => img.url);
+// Lê os campos de imagem de um bloco de variante, faz upload das pendentes
+// para o Firebase Storage e retorna array {url, caption}
+async function collectVariantImages(block) {
+  const items = [...block.querySelectorAll(".var-image-item")];
+  const result = [];
+  for (const item of items) {
+    const caption = item.querySelector(".var-image-caption").value.trim();
+    const pendingFile = pendingImageFiles.get(item);
+    if (pendingFile) {
+      const url = await window.storageUploadImage(pendingFile, pendingFile.name || "imagem.jpg");
+      pendingImageFiles.delete(item);
+      result.push({ url, caption });
+      continue;
+    }
+    const url = item.querySelector(".var-image-url").value.trim();
+    if (url) result.push({ url, caption });
+  }
+  return result;
+}
+
+// Faz upload de todas as imagens pendentes de todos os blocos de variante
+async function collectAllVariantsImages(blocks) {
+  const out = [];
+  for (const b of blocks) {
+    out.push({
+      label: b.querySelector(".var-label").value,
+      text: b.querySelector(".var-text").value,
+      images: await collectVariantImages(b)
+    });
+  }
+  return out;
 }
 
 async function saveNewPrescription(e) {
@@ -524,20 +564,15 @@ async function saveNewPrescription(e) {
   const sector = form.querySelector('[name="sector"]')?.value || "";
   const disease = form.querySelector('[name="disease"]')?.value || "";
   const blocks = document.querySelectorAll("#new-variants-container .variant-form-group");
-  
-  const variants = [...blocks].map(b => ({
-    label: b.querySelector(".var-label").value,
-    text: b.querySelector(".var-text").value,
-    images: collectVariantImages(b)
-  }));
 
-  if (!variants.length) {
+  if (!blocks.length) {
     alert("Adicione ao menos uma variante.");
     return;
   }
 
   showLoading();
   try {
+    const variants = await collectAllVariantsImages(blocks);
     await window.dbAdd({ sector, disease, variants });
     e.target.reset();
     document.getElementById("new-variants-container").innerHTML = "";
@@ -546,7 +581,8 @@ async function saveNewPrescription(e) {
     switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(err) {
-    alert("Erro ao salvar.");
+    console.error(err);
+    alert("Erro ao salvar." + (err?.message ? `\n${err.message}` : ""));
   } finally { hideLoading(); }
 }
 
@@ -589,15 +625,10 @@ async function updatePrescription(e) {
   const sector = getEl("edit-sector", "edit-rx-sector")?.value || "";
   const disease = getEl("edit-disease", "edit-rx-disease")?.value || "";
   const blocks = document.querySelectorAll("#variants-container .variant-form-group, #edit-variants-container .variant-form-group");
-  
-  const variants = [...blocks].map(b => ({
-    label: b.querySelector(".var-label").value,
-    text: b.querySelector(".var-text").value,
-    images: collectVariantImages(b)
-  }));
 
   showLoading();
   try {
+    const variants = await collectAllVariantsImages(blocks);
     await window.dbUpdate(id, { sector, disease, variants });
     alert("✓ Prescrição atualizada!");
     editingId = null;
@@ -605,7 +636,8 @@ async function updatePrescription(e) {
     switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(e) {
-    alert("Erro ao atualizar.");
+    console.error(e);
+    alert("Erro ao atualizar." + (e?.message ? `\n${e.message}` : ""));
   } finally { hideLoading(); }
 }
 
