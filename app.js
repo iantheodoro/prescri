@@ -476,47 +476,103 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   (images || []).forEach(img => addVariantImageEntry(imgList, img));
 }
 
-// Mapeia cada item de imagem do form ao arquivo pendente de upload
-const pendingImageFiles = new WeakMap();
+// ── Compressão de imagens (mantém tudo no Firestore, sem Storage) ─
+// Redimensiona para no máx. MAX_DIM px no maior lado e reexporta como
+// JPEG com qualidade reduzida, retornando um dataURL base64 leve.
+const IMG_MAX_DIM = 1000;
+const IMG_QUALITY = 0.72;
 
-// Lê arquivos selecionados, gera preview local e marca para upload no Storage ao salvar
-function handleVariantImageUpload(e, input) {
-  const list = input.closest(".var-images-block").querySelector(".var-images-list");
-  const files = [...(e.target.files || [])];
-  files.forEach(file => {
+function compressImageFile(file) {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Falha ao ler o arquivo de imagem."));
     reader.onload = () => {
-      const item = addVariantImageEntry(list, { url: "", caption: "" });
-      const thumb = item.querySelector(".var-image-thumb");
-      const urlInput = item.querySelector(".var-image-url");
-      thumb.src = reader.result;
-      urlInput.placeholder = "Será enviada ao salvar…";
-      urlInput.readOnly = true;
-      item.classList.add("pending-upload");
-      pendingImageFiles.set(item, file);
+      const img = new Image();
+      img.onerror = () => reject(new Error("Falha ao processar a imagem."));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > IMG_MAX_DIM || height > IMG_MAX_DIM) {
+          if (width >= height) {
+            height = Math.round(height * (IMG_MAX_DIM / width));
+            width = IMG_MAX_DIM;
+          } else {
+            width = Math.round(width * (IMG_MAX_DIM / height));
+            height = IMG_MAX_DIM;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", IMG_QUALITY));
+      };
+      img.src = reader.result;
     };
     reader.readAsDataURL(file);
   });
+}
+
+// Lê arquivos selecionados, comprime e adiciona à variante como base64
+function handleVariantImageUpload(e, input) {
+  const list = input.closest(".var-images-block").querySelector(".var-images-list");
+  const files = [...(e.target.files || [])];
+  files.forEach(async file => {
+    const item = addVariantImageEntry(list, { url: "", caption: "" });
+    const thumb = item.querySelector(".var-image-thumb");
+    const urlInput = item.querySelector(".var-image-url");
+    urlInput.disabled = true;
+    urlInput.placeholder = "Comprimindo imagem…";
+    try {
+      const dataUrl = await compressImageFile(file);
+      thumb.src = dataUrl;
+      item.dataset.embeddedUrl = dataUrl;
+      urlInput.value = "";
+      urlInput.placeholder = `Imagem incorporada (${formatBytes(dataUrl.length)})`;
+      const sizeLabel = item.querySelector(".var-image-size");
+      if (sizeLabel) sizeLabel.textContent = formatBytes(dataUrl.length);
+    } catch (err) {
+      console.error(err);
+      alert("Não foi possível processar essa imagem.");
+      item.remove();
+    } finally {
+      urlInput.disabled = false;
+    }
+  });
   input.value = "";
+}
+
+function formatBytes(n) {
+  return n > 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`;
 }
 
 function addVariantImageEntry(list, img = { url: "", caption: "" }) {
   const item = document.createElement("div");
   item.className = "var-image-item";
+  const isEmbedded = (img.url || "").startsWith("data:");
   item.innerHTML = `
     <img class="var-image-thumb" src="${escapeHtml(img.url || "")}" alt="" />
-    <input type="text" class="var-image-url" placeholder="URL da imagem (ou envie um arquivo)" value="${escapeHtml(img.url || "")}" />
-    <input type="text" class="var-image-caption" placeholder="Legenda (opcional)" value="${escapeHtml(img.caption || "")}" />
+    <div class="var-image-fields">
+      <input type="text" class="var-image-url" placeholder="URL da imagem (ou envie um arquivo)" value="${isEmbedded ? "" : escapeHtml(img.url || "")}" />
+      <input type="text" class="var-image-caption" placeholder="Legenda (opcional)" value="${escapeHtml(img.caption || "")}" />
+      ${isEmbedded ? `<span class="var-image-size">${formatBytes(img.url.length)}</span>` : ""}
+    </div>
     <button type="button" class="btn-remove-var" onclick="this.parentElement.remove()">✕</button>
   `;
   const urlInput = item.querySelector(".var-image-url");
   const thumb = item.querySelector(".var-image-thumb");
+  if (isEmbedded) {
+    item.dataset.embeddedUrl = img.url;
+    urlInput.placeholder = `Imagem incorporada (${formatBytes(img.url.length)})`;
+  }
   urlInput.addEventListener("input", () => {
+    delete item.dataset.embeddedUrl;
     thumb.src = urlInput.value;
-    item.classList.remove("pending-upload");
-    pendingImageFiles.delete(item);
-    urlInput.readOnly = false;
     urlInput.placeholder = "URL da imagem (ou envie um arquivo)";
+    const sizeLabel = item.querySelector(".var-image-size");
+    if (sizeLabel) sizeLabel.remove();
   });
   list.appendChild(item);
   return item;
@@ -525,37 +581,22 @@ function addVariantImageEntry(list, img = { url: "", caption: "" }) {
 function addNewVariantField() { addVariantField("new-variants-container"); }
 function addVariantFieldEdit() { addVariantField("variants-container"); }
 
-// Lê os campos de imagem de um bloco de variante, faz upload das pendentes
-// para o Firebase Storage e retorna array {url, caption}
-async function collectVariantImages(block) {
-  const items = [...block.querySelectorAll(".var-image-item")];
-  const result = [];
-  for (const item of items) {
-    const caption = item.querySelector(".var-image-caption").value.trim();
-    const pendingFile = pendingImageFiles.get(item);
-    if (pendingFile) {
-      const url = await window.storageUploadImage(pendingFile, pendingFile.name || "imagem.jpg");
-      pendingImageFiles.delete(item);
-      result.push({ url, caption });
-      continue;
-    }
-    const url = item.querySelector(".var-image-url").value.trim();
-    if (url) result.push({ url, caption });
-  }
-  return result;
+// Lê os campos de imagem de um bloco de variante e retorna array {url, caption}
+function collectVariantImages(block) {
+  return [...block.querySelectorAll(".var-image-item")]
+    .map(item => ({
+      url: item.dataset.embeddedUrl || item.querySelector(".var-image-url").value.trim(),
+      caption: item.querySelector(".var-image-caption").value.trim()
+    }))
+    .filter(img => img.url);
 }
 
-// Faz upload de todas as imagens pendentes de todos os blocos de variante
-async function collectAllVariantsImages(blocks) {
-  const out = [];
-  for (const b of blocks) {
-    out.push({
-      label: b.querySelector(".var-label").value,
-      text: b.querySelector(".var-text").value,
-      images: await collectVariantImages(b)
-    });
-  }
-  return out;
+function collectAllVariantsImages(blocks) {
+  return [...blocks].map(b => ({
+    label: b.querySelector(".var-label").value,
+    text: b.querySelector(".var-text").value,
+    images: collectVariantImages(b)
+  }));
 }
 
 async function saveNewPrescription(e) {

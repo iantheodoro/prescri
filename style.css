@@ -440,7 +440,7 @@ html, body {
 
 .var-image-item {
   display: grid;
-  grid-template-columns: 56px 1fr 1fr auto;
+  grid-template-columns: 56px 1fr auto;
   gap: 8px;
   align-items: center;
 }
@@ -453,6 +453,12 @@ html, body {
   background: var(--bg3);
 }
 
+.var-image-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .var-image-url, .var-image-caption {
   background: var(--bg3);
   border: 1.5px solid var(--border);
@@ -461,23 +467,20 @@ html, body {
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 8px 10px;
+  width: 100%;
 }
 .var-image-url:focus, .var-image-caption:focus { border-color: var(--accent); }
+.var-image-url:disabled { opacity: 0.6; }
 
-.var-image-item.pending-upload .var-image-url {
-  color: var(--text-dim);
-  font-style: italic;
-}
-.var-image-item.pending-upload .var-image-thumb {
-  border-color: var(--accent);
+.var-image-size {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
 }
 
 @media (max-width: 640px) {
-  .var-image-item { grid-template-columns: 40px 1fr; grid-template-areas: "thumb url" "thumb caption" "thumb remove"; }
-  .var-image-thumb { grid-area: thumb; width: 40px; height: 40px; }
-  .var-image-url { grid-area: url; }
-  .var-image-caption { grid-area: caption; }
-  .var-image-item .btn-remove-var { grid-area: remove; justify-self: start; }
+  .var-image-item { grid-template-columns: 40px 1fr auto; }
+  .var-image-thumb { width: 40px; height: 40px; }
 }
 
 
