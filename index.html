@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260601-4" />
+  <link rel="stylesheet" href="style.css?v=20260614-1" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -67,6 +67,15 @@
           <div class="sector-icon">🤰</div>
           <div class="sector-name">GO</div>
           <div class="sector-desc">Ginecologia e Obstetrícia</div>
+        </button>
+      </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Eletrocardiograma</div>
+      <div class="sector-grid sector-grid-special">
+        <button class="sector-card sector-card-special" data-sector="ECG" onclick="selectSector(this)">
+          <div class="sector-icon">📈</div>
+          <div class="sector-name">ECG</div>
+          <div class="sector-desc">Padrões e laudos com imagens</div>
         </button>
       </div>
 
@@ -132,6 +141,7 @@
           </div>
         </div>
       </div>
+      <div id="rx-image-gallery" class="rx-image-gallery"></div>
       <div class="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -335,6 +345,7 @@
             <option value="UTI">UTI</option>
             <option value="Pediatria">Pediatria</option>
             <option value="GO">GO</option>
+            <option value="ECG">ECG</option>
           </select>
         </div>
         <div class="admin-list" id="admin-list"></div>
@@ -350,6 +361,7 @@
             <option value="UTI">UTI</option>
             <option value="Pediatria">Pediatria</option>
             <option value="GO">GO</option>
+            <option value="ECG">ECG</option>
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" name="disease" placeholder="ex: Pneumonia" required />
@@ -370,6 +382,7 @@
             <option value="UTI">UTI</option>
             <option value="Pediatria">Pediatria</option>
             <option value="GO">GO</option>
+            <option value="ECG">ECG</option>
           </select>
           <label>Nome da Doença / Diagnóstico</label>
           <input type="text" id="edit-disease" required />
@@ -482,9 +495,9 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260601-1"></script>
-  <script src="pediatria.js?v=20260601-1"></script>
-  <script src="db.js?v=20260601-1"></script>
-  <script src="app.js?v=20260601-1"></script>
+  <script src="shortcuts.js?v=20260614-1"></script>
+  <script src="pediatria.js?v=20260614-1"></script>
+  <script src="db.js?v=20260614-1"></script>
+  <script src="app.js?v=20260614-1"></script>
 </body>
 </html>

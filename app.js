@@ -158,6 +158,7 @@ function renderVariantContent(idx) {
   const v = currentPrescription.variants && currentPrescription.variants[idx];
   if (!v) {
     body.innerHTML = "Nenhum texto disponível.";
+    renderRxImageGallery(null);
     return;
   }
 
@@ -169,6 +170,44 @@ function renderVariantContent(idx) {
   }
 
   body.innerText = text;
+  renderRxImageGallery(v.images);
+}
+
+// Renderiza a galeria de imagens da variante (ex: traçados de ECG)
+function renderRxImageGallery(images) {
+  const gallery = document.getElementById("rx-image-gallery");
+  if (!gallery) return;
+  if (!images || !images.length) {
+    gallery.innerHTML = "";
+    gallery.style.display = "none";
+    return;
+  }
+  gallery.style.display = "flex";
+  gallery.innerHTML = images.map(img => `
+    <figure class="rx-image-figure">
+      <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.caption || "")}" onclick="openImageViewer('${escapeHtml(img.url)}')" />
+      ${img.caption ? `<figcaption>${escapeHtml(img.caption)}</figcaption>` : ""}
+    </figure>
+  `).join("");
+}
+
+// Visualizador em tela cheia
+function openImageViewer(url) {
+  let viewer = document.getElementById("image-viewer-overlay");
+  if (!viewer) {
+    viewer = document.createElement("div");
+    viewer.id = "image-viewer-overlay";
+    viewer.className = "image-viewer-overlay";
+    viewer.onclick = closeImageViewer;
+    viewer.innerHTML = `<img id="image-viewer-img" src="" alt="" />`;
+    document.body.appendChild(viewer);
+  }
+  document.getElementById("image-viewer-img").src = url;
+  viewer.classList.add("open");
+}
+function closeImageViewer() {
+  const viewer = document.getElementById("image-viewer-overlay");
+  if (viewer) viewer.classList.remove("open");
 }
 
 function updatePediatricPrescriptionContext() {
@@ -411,7 +450,7 @@ function filterAdminList() {
 }
 
 // ── Fluxos de Inclusão e Edição Estrutural no Form ────────
-function addVariantField(containerId = "variants-container", label = "", text = "") {
+function addVariantField(containerId = "variants-container", label = "", text = "", images = []) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const div = document.createElement("div");
@@ -422,12 +461,62 @@ function addVariantField(containerId = "variants-container", label = "", text = 
       <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.parentElement.parentElement.remove()">✕ Remover</button>
     </div>
     <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required>${escapeHtml(text)}</textarea>
+    <div class="var-images-block">
+      <div class="var-images-head">
+        <span>Imagens</span>
+        <label class="btn-add-image">+ Adicionar imagem
+          <input type="file" accept="image/*" multiple class="var-image-input" onchange="handleVariantImageUpload(event, this)" hidden />
+        </label>
+      </div>
+      <div class="var-images-list"></div>
+    </div>
   `;
   container.appendChild(div);
+  const imgList = div.querySelector(".var-images-list");
+  (images || []).forEach(img => addVariantImageEntry(imgList, img));
+}
+
+// Lê arquivos selecionados, converte para base64 e adiciona à variante
+function handleVariantImageUpload(e, input) {
+  const list = input.closest(".var-images-block").querySelector(".var-images-list");
+  const files = [...(e.target.files || [])];
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      addVariantImageEntry(list, { url: reader.result, caption: "" });
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value = "";
+}
+
+function addVariantImageEntry(list, img = { url: "", caption: "" }) {
+  const item = document.createElement("div");
+  item.className = "var-image-item";
+  item.innerHTML = `
+    <img class="var-image-thumb" src="${escapeHtml(img.url || "")}" alt="" />
+    <input type="text" class="var-image-url" placeholder="URL da imagem (ou envie um arquivo)" value="${escapeHtml(img.url || "")}" />
+    <input type="text" class="var-image-caption" placeholder="Legenda (opcional)" value="${escapeHtml(img.caption || "")}" />
+    <button type="button" class="btn-remove-var" onclick="this.parentElement.remove()">✕</button>
+  `;
+  const urlInput = item.querySelector(".var-image-url");
+  const thumb = item.querySelector(".var-image-thumb");
+  urlInput.addEventListener("input", () => { thumb.src = urlInput.value; });
+  list.appendChild(item);
 }
 
 function addNewVariantField() { addVariantField("new-variants-container"); }
 function addVariantFieldEdit() { addVariantField("variants-container"); }
+
+// Lê os campos de imagem de um bloco de variante e retorna array {url, caption}
+function collectVariantImages(block) {
+  return [...block.querySelectorAll(".var-image-item")]
+    .map(item => ({
+      url: item.querySelector(".var-image-url").value.trim(),
+      caption: item.querySelector(".var-image-caption").value.trim()
+    }))
+    .filter(img => img.url);
+}
 
 async function saveNewPrescription(e) {
   e.preventDefault();
@@ -438,7 +527,8 @@ async function saveNewPrescription(e) {
   
   const variants = [...blocks].map(b => ({
     label: b.querySelector(".var-label").value,
-    text: b.querySelector(".var-text").value
+    text: b.querySelector(".var-text").value,
+    images: collectVariantImages(b)
   }));
 
   if (!variants.length) {
@@ -479,7 +569,7 @@ async function startEdit(id) {
     container.innerHTML = "";
     
     if (p.variants && p.variants.length) {
-      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text));
+      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text, v.images));
     } else {
       addVariantField("variants-container", "Padrão", p.text || "");
     }
@@ -502,7 +592,8 @@ async function updatePrescription(e) {
   
   const variants = [...blocks].map(b => ({
     label: b.querySelector(".var-label").value,
-    text: b.querySelector(".var-text").value
+    text: b.querySelector(".var-text").value,
+    images: collectVariantImages(b)
   }));
 
   showLoading();
@@ -1005,6 +1096,7 @@ Object.assign(window, {
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, addNewVariantField, addVariantFieldEdit,
+  handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
   openPediatria, switchPedTab, calculateDose, copyPedResult, filterPedDiseases, updatePediatricPrescriptionContext,
   renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview

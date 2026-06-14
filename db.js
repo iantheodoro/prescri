@@ -327,6 +327,110 @@ INDICAÇÕES MÉDICAS:
 5. MONITORIZAÇÃO 4–8h após resolução`
       }
     ]
+  },
+  {
+    sector: "ECG",
+    disease: "Infarto Agudo do Miocárdio com Supra de ST (IAMCSST)",
+    variants: [
+      {
+        label: "Padrão de Lesão",
+        text: `PADRÃO ELETROCARDIOGRÁFICO — IAMCSST
+
+ACHADOS:
+- Supradesnivelamento do segmento ST ≥ 1 mm em 2 derivações
+  contíguas (≥ 2 mm em V2-V3 para homens ≥ 40 anos / ≥ 1,5 mm
+  para mulheres)
+- Onda T hiperaguda na fase inicial
+- Imagem em espelho (infradesnivelamento) na parede recíproca
+- Possível surgimento de onda Q patológica na evolução
+
+LOCALIZAÇÃO PELAS DERIVAÇÕES:
+- Anterior: V1-V4
+- Lateral: I, aVL, V5-V6
+- Inferior: II, III, aVF
+- Posterior: V7-V9 (imagem em espelho em V1-V3)
+
+⚡ CONDUTA: ver protocolo de Sala Vermelha — IAMCSST
+(CATE em < 90 min da chegada)`,
+        images: []
+      }
+    ]
+  },
+  {
+    sector: "ECG",
+    disease: "Fibrilação Atrial",
+    variants: [
+      {
+        label: "Padrão Típico",
+        text: `PADRÃO ELETROCARDIOGRÁFICO — FIBRILAÇÃO ATRIAL
+
+ACHADOS:
+- Ausência de ondas P organizadas
+- Atividade atrial caótica (ondas "f" de fibrilação)
+- Intervalos R-R irregularmente irregulares
+- Frequência ventricular variável (geralmente 100–180 bpm
+  se não controlada)
+- Complexo QRS geralmente estreito (a menos que haja bloqueio
+  de ramo associado)
+
+OBSERVAÇÕES:
+- Avaliar tempo de início para decisão sobre cardioversão
+- Calcular CHA₂DS₂-VASc para risco de AVC
+- Avaliar necessidade de anticoagulação`,
+        images: []
+      }
+    ]
+  },
+  {
+    sector: "ECG",
+    disease: "Bloqueios Atrioventriculares (BAV)",
+    variants: [
+      {
+        label: "BAV de 1º Grau",
+        text: `PADRÃO ELETROCARDIOGRÁFICO — BAV 1º GRAU
+
+ACHADOS:
+- Intervalo PR prolongado > 200 ms (> 1 quadrado grande)
+- Todas as ondas P são seguidas de QRS (1:1)
+- Geralmente assintomático, sem necessidade de tratamento
+  específico na ausência de outros achados`,
+        images: []
+      },
+      {
+        label: "BAV de 2º Grau — Mobitz I",
+        text: `PADRÃO ELETROCARDIOGRÁFICO — BAV 2º GRAU MOBITZ I
+
+ACHADOS:
+- Prolongamento progressivo do intervalo PR até a ocorrência
+  de uma onda P bloqueada (fenômeno de Wenckebach)
+- Geralmente benigno, nível de bloqueio no nó AV
+- Acompanhamento clínico; raramente necessita marcapasso`,
+        images: []
+      },
+      {
+        label: "BAV de 2º Grau — Mobitz II",
+        text: `PADRÃO ELETROCARDIOGRÁFICO — BAV 2º GRAU MOBITZ II
+
+ACHADOS:
+- Ondas P bloqueadas de forma súbita, sem prolongamento
+  progressivo do PR
+- Risco de progressão para BAVT — geralmente indicação de
+  marcapasso definitivo`,
+        images: []
+      },
+      {
+        label: "BAV Total (3º Grau)",
+        text: `PADRÃO ELETROCARDIOGRÁFICO — BAV TOTAL (3º GRAU)
+
+ACHADOS:
+- Dissociação completa entre ondas P e complexos QRS
+- Frequência atrial maior que a frequência ventricular,
+  sem relação entre elas
+- Ritmo de escape (juncional ou ventricular)
+- Geralmente indicação de marcapasso definitivo`,
+        images: []
+      }
+    ]
   }
 ];
 
