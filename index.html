@@ -6,10 +6,11 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260614-4" />
+  <link rel="stylesheet" href="style.css?v=20260614-3" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
+    // Limpa service worker e caches antigos para evitar travar versões antigas
     (async () => {
       try {
         if ("serviceWorker" in navigator) {
@@ -36,15 +37,6 @@
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento</p>
 
-      <!-- ANOTAÇÕES -->
-      <div style="width:100%;max-width:720px;margin-bottom:20px;">
-        <button class="sector-card sector-card-special" onclick="openAnotacoes()" style="border-color:#fbbf24;background:rgba(251,191,36,0.05);">
-          <div class="sector-icon">📝</div>
-          <div class="sector-name">Anotações</div>
-          <div class="sector-desc">Notas rápidas (expiram em 48h)</div>
-        </button>
-      </div>
-
       <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
         <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
@@ -52,7 +44,7 @@
           <div class="sector-name">Sala Verde</div>
           <div class="sector-desc">Média complexidade</div>
         </button>
-        <button class="sector-card sector-card-red" data-sector="Sala Vermelha" onclick="selectSector(this)">
+        <button class="sector-card" data-sector="Sala Vermelha" onclick="selectSector(this)">
           <div class="sector-icon">🚨</div>
           <div class="sector-name">Sala Vermelha</div>
           <div class="sector-desc">Emergências críticas</div>
@@ -100,25 +92,14 @@
           <div class="sector-desc">Infusão bidirecional por peso</div>
         </button>
       </div>
-    </div>
-  </div>
 
-  <!-- ANOTAÇÕES SCREEN -->
-  <div id="screen-anotacoes" class="screen">
-    <div class="bg-grid"></div>
-    <div class="top-bar">
-      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
-      <div class="sector-badge" style="background:rgba(251,191,36,0.15);border-color:#fbbf24;color:#fbbf24">📝 Anotações</div>
-      <button class="btn-admin" onclick="clearAnotacoes()" style="color:#ff5e5e;border-color:#ff5e5e;">🗑 Limpar tudo</button>
-    </div>
-    <div class="disease-content">
-      <h2 class="section-title">Anotações <em>rápidas</em></h2>
-      <div class="anotacao-input-area" style="margin-bottom:16px;">
-        <textarea id="anotacao-input" rows="4" placeholder="Escreva sua anotação aqui..." style="width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:14px;padding:12px;resize:vertical;outline:none;"></textarea>
-        <button onclick="salvarAnotacao()" style="margin-top:8px;background:#fbbf24;color:#050a07;border:none;font-family:var(--font-body);font-weight:700;padding:10px 24px;border-radius:var(--radius-sm);cursor:pointer;">➕ Adicionar anotação</button>
-        <span style="margin-left:12px;font-size:11px;color:var(--text-dim);">(expira em 48h)</span>
+      <!-- Aba de Anotações 48h -->
+      <div class="home-notes-container">
+        <div class="home-notes-header">
+          <span>📝 Anotações (Apagam após 48h)</span>
+        </div>
+        <textarea id="home-notes" class="home-notes-textarea" placeholder="Escreva aqui seus lembretes e pendências..."></textarea>
       </div>
-      <div class="disease-list" id="anotacoes-list"></div>
     </div>
   </div>
 
@@ -169,16 +150,6 @@
         </div>
       </div>
       <div id="rx-image-gallery" class="rx-image-gallery"></div>
-      
-      <!-- CUIDADO - ANOTAÇÃO AMARELA NO CANTO DIREITO -->
-      <div id="cuidado-nota" class="cuidado-nota" style="display:none;">
-        <div class="cuidado-content">
-          <span class="cuidado-icon">⚠️</span>
-          <span class="cuidado-text" id="cuidado-texto"></span>
-          <button class="cuidado-close" onclick="fecharCuidado()">✕</button>
-        </div>
-      </div>
-      
       <div class="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -196,7 +167,9 @@
     </div>
   </div>
 
-  <!-- PEDIATRIA SCREEN -->
+  <!-- ═══════════════════════════════════════════════════════
+       PEDIATRIA SCREEN
+  ═══════════════════════════════════════════════════════ -->
   <div id="screen-pediatria" class="screen">
     <div class="bg-grid"></div>
     <div class="top-bar">
@@ -206,21 +179,25 @@
     </div>
 
     <div class="ped-content">
+      <!-- ABAS PEDIATRIA -->
       <div class="ped-tabs">
         <button class="ped-tab active" onclick="switchPedTab('ped-calc', this)">🧮 Calculadora</button>
         <button class="ped-tab" onclick="switchPedTab('ped-rx', this)">📋 Prescrições</button>
       </div>
 
+      <!-- CALCULADORA -->
       <div id="ped-calc" class="ped-tab-content active">
         <div class="ped-weight-card">
           <label class="ped-label">Peso da criança (kg)</label>
           <div class="ped-weight-row">
-            <input type="number" id="ped-weight" min="1" max="100" step="0.1" placeholder="ex: 12,5" oninput="calculateDose()" />
+            <input type="number" id="ped-weight" min="1" max="100" step="0.1"
+              placeholder="ex: 12,5" oninput="calculateDose()" />
             <span class="ped-weight-unit">kg</span>
           </div>
           <label class="ped-label" style="margin-top:12px">Idade (anos)</label>
           <div class="ped-weight-row">
-            <input type="number" id="ped-age" min="0" max="18" step="0.1" placeholder="ex: 4" oninput="calculateDose()" />
+            <input type="number" id="ped-age" min="0" max="18" step="0.1"
+              placeholder="ex: 4" oninput="calculateDose()" />
             <span class="ped-weight-unit">anos</span>
           </div>
           <label class="ped-label" style="margin-top:12px">Medicamento</label>
@@ -234,20 +211,25 @@
             <span id="ped-result-drug"></span>
             <span class="ped-result-route" id="ped-result-route"></span>
           </div>
+
           <div class="ped-dose-box">
             <div class="ped-dose-label">Dose por kg</div>
             <div class="ped-dose-value" id="ped-dose-per-kg"></div>
           </div>
+
           <div class="ped-dose-box ped-dose-highlight">
             <div class="ped-dose-label">Dose calculada</div>
             <div class="ped-dose-value" id="ped-dose-calc"></div>
             <div class="ped-dose-sub" id="ped-dose-interval"></div>
           </div>
+
           <div class="ped-presentations">
             <div class="ped-pres-label">Volumes / Quantidades por apresentação</div>
             <div id="ped-pres-list"></div>
           </div>
+
           <div class="ped-notes" id="ped-notes"></div>
+
           <button class="btn-copy-ped" onclick="copyPedResult()">
             <span>⎘</span> Copiar resultado
           </button>
@@ -260,6 +242,7 @@
         </div>
       </div>
 
+      <!-- PRESCRIÇÕES PEDIÁTRICAS -->
       <div id="ped-rx" class="ped-tab-content">
         <div class="search-wrap" style="padding:0 0 16px">
           <input type="text" id="ped-search" placeholder="Buscar diagnóstico pediátrico..." oninput="filterPedDiseases()" />
@@ -276,11 +259,13 @@
       <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
       <div class="sector-badge" style="background:rgba(248,113,113,0.12);border-color:#f87171;color:#f87171">🫁 Intubação</div>
     </div>
+
     <div class="iot-content">
       <div class="rx-header">
         <span class="rx-tag">CALCULADORA</span>
         <h2 class="rx-title">Intubação Orotraqueal</h2>
       </div>
+
       <div class="iot-weight-card">
         <label class="ped-label">Peso do paciente</label>
         <div class="ped-weight-row">
@@ -288,9 +273,11 @@
           <span class="ped-weight-unit">kg</span>
         </div>
       </div>
+
       <div class="iot-warning">
         Ferramenta auxiliar. Não substitui julgamento clínico, contexto do paciente, protocolos locais ou checagem independente.
       </div>
+
       <div id="iot-drug-results"></div>
     </div>
   </div>
@@ -302,11 +289,13 @@
       <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
       <div class="sector-badge" style="background:rgba(56,189,248,0.12);border-color:#38bdf8;color:#38bdf8">💧 Sedação contínua</div>
     </div>
+
     <div class="iot-content">
       <div class="rx-header">
         <span class="rx-tag">CALCULADORA</span>
         <h2 class="rx-title">Infusão de Sedação</h2>
       </div>
+
       <div class="iot-weight-card">
         <label class="ped-label">Peso do paciente</label>
         <div class="ped-weight-row">
@@ -314,9 +303,11 @@
           <span class="ped-weight-unit">kg</span>
         </div>
       </div>
+
       <div class="iot-warning">
         Cálculo bidirecional: informe a vazão para obter dose, ou informe a dose desejada para obter vazão. Ferramenta auxiliar.
       </div>
+
       <div id="sed-results" class="sed-card"></div>
     </div>
   </div>
@@ -346,7 +337,7 @@
         <button class="modal-close" onclick="closeAdmin()">✕</button>
       </div>
       <div class="modal-tabs">
-        <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">📋 Ver</button>
+        <button class="tab active" id="tab-list-btn" onclick="switchTab('tab-list', this)">Ver</button>
         <button class="tab" onclick="switchTab('tab-add', this)">+ Nova</button>
         <button class="tab" id="tab-edit-btn" onclick="switchTab('tab-edit', this)" style="display:none">✎ Editar</button>
         <button class="tab" onclick="switchTab('tab-ped-drugs', this)">Pediatria</button>
@@ -354,8 +345,7 @@
       </div>
 
       <div id="tab-list" class="tab-content active">
-        <div class="admin-filter">
-          <input type="text" id="admin-search" placeholder="🔍 Buscar por nome da doença..." oninput="filterAdminList()" style="width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-body);font-size:14px;padding:10px 14px;outline:none;margin-bottom:10px;" />
+        <div class="admin-filter" style="display:flex; gap:8px;">
           <select id="admin-sector-filter" onchange="renderAdminList()">
             <option value="">Todos os setores</option>
             <option value="Sala Verde">Sala Verde</option>
@@ -365,6 +355,7 @@
             <option value="GO">GO</option>
             <option value="ECG">ECG</option>
           </select>
+          <input type="text" id="admin-search" placeholder="Buscar prescrição por nome..." oninput="filterAdminList()" style="flex:1;" />
         </div>
         <div class="admin-list" id="admin-list"></div>
       </div>
@@ -434,11 +425,14 @@
 
           <form class="admin-form ped-admin-form" onsubmit="savePedDrug(event)">
             <input type="hidden" id="ped-admin-original-id" />
+
             <label>Nome do medicamento</label>
             <input type="text" id="ped-admin-name" placeholder="ex: Cefalexina" required />
+
             <label>Código do marcador</label>
             <input type="text" id="ped-admin-id" placeholder="ex: cefalexina" required />
             <p class="field-help">Use apenas letras, números e underline. Ex: cefalexina vira {{cefalexina_ml}}.</p>
+
             <div class="form-grid-2">
               <div>
                 <label>Categoria</label>
@@ -449,6 +443,7 @@
                 <input type="text" id="ped-admin-route" placeholder="VO" />
               </div>
             </div>
+
             <div class="form-grid-2">
               <div>
                 <label>Doses por dia</label>
@@ -460,19 +455,24 @@
                 </select>
               </div>
             </div>
+
             <label>Intervalo</label>
             <input type="text" id="ped-admin-interval" placeholder="a cada 6 horas" />
+
             <label>Observações</label>
             <textarea id="ped-admin-notes" rows="3" placeholder="Orientações, dose usual, cuidados..."></textarea>
+
             <div class="ped-admin-head">
               <span>Apresentações</span>
               <button type="button" class="btn-edit-item" onclick="addPedPresentationField()">+ Adicionar</button>
             </div>
             <div id="ped-presentations-admin"></div>
+
             <div class="ped-marker-preview">
               <span>Marcadores deste medicamento: use _dose na receita e _mg apenas se quiser ver miligramas</span>
               <div id="ped-marker-preview"></div>
             </div>
+
             <div style="display:flex;gap:12px;margin-top:8px">
               <button type="submit" class="btn-save">Salvar Medicamento</button>
               <button type="button" class="btn-delete" id="ped-admin-delete" onclick="deletePedDrug()" style="display:none">Excluir</button>
@@ -504,9 +504,17 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260614-4"></script>
-  <script src="pediatria.js?v=20260614-4"></script>
-  <script src="db.js?v=20260614-4"></script>
-  <script src="app.js?v=20260614-4"></script>
+  <!-- Post-it Flutuante -->
+  <div id="floating-alert-note" class="floating-alert-note">
+    <div class="floating-note-content">
+      <textarea id="sticky-notes-text" placeholder="Anotações rápidas..."></textarea>
+    </div>
+    <button class="btn-floating-note" onclick="toggleFloatingNote()">⚠️</button>
+  </div>
+
+  <script src="shortcuts.js?v=20260614-3"></script>
+  <script src="pediatria.js?v=20260614-3"></script>
+  <script src="db.js?v=20260614-3"></script>
+  <script src="app.js?v=20260614-3"></script>
 </body>
 </html>
