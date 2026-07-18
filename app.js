@@ -68,12 +68,13 @@ async function renderDiseaseList(filter = "") {
     const raw = (await window.dbGetBySector(currentSector))
       .filter(p => {
         const filterLower = filter.toLowerCase();
-        const dMatch = p.disease.toLowerCase().includes(filterLower);
+        const dMatch = (p.disease || "").toLowerCase().includes(filterLower);
+        const textMatch = (p.text || "").toLowerCase().includes(filterLower);
         const vMatch = p.variants && p.variants.some(v => 
           (v.text || "").toLowerCase().includes(filterLower) || 
           (v.label || "").toLowerCase().includes(filterLower)
         );
-        return dMatch || vMatch;
+        return dMatch || textMatch || vMatch;
       })
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
     const seen = new Set();
@@ -89,13 +90,18 @@ async function renderDiseaseList(filter = "") {
       return;
     }
 
-    list.innerHTML = items.map(p => `
+    list.innerHTML = items.map(p => {
+      const isContentMatch = filter && !(p.disease || "").toLowerCase().includes(filter.toLowerCase());
+      return `
       <button class="disease-item" onclick="openPrescription('${p.id}')">
         <span class="disease-arrow">→</span>
-        <span class="disease-label">${p.disease}</span>
+        <span class="disease-label" style="display:flex;flex-direction:column;gap:2px;">
+          <span>${p.disease}</span>
+          ${isContentMatch ? `<small style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">⚲ Contém: "${filter}"</small>` : ''}
+        </span>
         ${p.variants && p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} variantes</span>` : ''}
       </button>
-    `).join("");
+    `}).join("");
   } catch (e) {
     list.innerHTML = `<div class="empty-state">Erro ao conectar ao banco. Verifique sua conexão.</div>`;
   } finally {
@@ -104,7 +110,8 @@ async function renderDiseaseList(filter = "") {
 }
 
 function filterDiseases() {
-  renderDiseaseList(document.getElementById("disease-search").value);
+  const el = document.getElementById("search-input");
+  renderDiseaseList(el ? el.value : "");
 }
 
 // ── Visualização de Prescrições e Abas ────────────────────
@@ -435,11 +442,12 @@ async function renderAdminList(filter = "") {
     const filtered = all.filter(x => {
       const dMatch = (x.disease || "").toLowerCase().includes(filterLower);
       const sMatch = (x.sector || "").toLowerCase().includes(filterLower);
+      const textMatch = (x.text || "").toLowerCase().includes(filterLower);
       const vMatch = x.variants && x.variants.some(v => 
         (v.text || "").toLowerCase().includes(filterLower) || 
         (v.label || "").toLowerCase().includes(filterLower)
       );
-      return dMatch || sMatch || vMatch;
+      return dMatch || sMatch || textMatch || vMatch;
     });
     const scoped = sectorFilter ? filtered.filter(x => x.sector === sectorFilter) : filtered;
 
@@ -854,12 +862,13 @@ async function renderPedDiseaseList(filter = "") {
     const rawPed = (await window.dbGetBySector("Pediatria"))
       .filter(p => {
         const filterLower = filter.toLowerCase();
-        const dMatch = p.disease.toLowerCase().includes(filterLower);
+        const dMatch = (p.disease || "").toLowerCase().includes(filterLower);
+        const textMatch = (p.text || "").toLowerCase().includes(filterLower);
         const vMatch = p.variants && p.variants.some(v => 
           (v.text || "").toLowerCase().includes(filterLower) || 
           (v.label || "").toLowerCase().includes(filterLower)
         );
-        return dMatch || vMatch;
+        return dMatch || textMatch || vMatch;
       })
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
     const seenPed = new Set();
@@ -873,13 +882,18 @@ async function renderPedDiseaseList(filter = "") {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
       return;
     }
-    list.innerHTML = items.map(p => `
+    list.innerHTML = items.map(p => {
+      const isContentMatch = filter && !(p.disease || "").toLowerCase().includes(filter.toLowerCase());
+      return `
       <button class="disease-item" onclick="openPrescription('${p.id}')">
         <span class="disease-arrow">→</span>
-        <span class="disease-label">${p.disease}</span>
+        <span class="disease-label" style="display:flex;flex-direction:column;gap:2px;">
+          <span>${p.disease}</span>
+          ${isContentMatch ? `<small style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">⚲ Contém: "${filter}"</small>` : ''}
+        </span>
         ${p.variants && p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} variantes</span>` : ''}
       </button>
-    `).join("");
+    `}).join("");
   } catch(e) {
     list.innerHTML = `<div class="empty-state">Erro ao carregar diagnósticos pediátricos.</div>`;
   } finally { hideLoading(); }
