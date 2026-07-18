@@ -66,7 +66,15 @@ async function renderDiseaseList(filter = "") {
   showLoading();
   try {
     const raw = (await window.dbGetBySector(currentSector))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
+      .filter(p => {
+        const filterLower = filter.toLowerCase();
+        const dMatch = p.disease.toLowerCase().includes(filterLower);
+        const vMatch = p.variants && p.variants.some(v => 
+          (v.text || "").toLowerCase().includes(filterLower) || 
+          (v.label || "").toLowerCase().includes(filterLower)
+        );
+        return dMatch || vMatch;
+      })
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
     const seen = new Set();
     const items = raw.filter(p => {
@@ -423,10 +431,16 @@ async function renderAdminList(filter = "") {
     const all = await window.dbGetAll();
     const sectorFilter = document.getElementById("admin-sector-filter")?.value || "";
     
-    const filtered = all.filter(x => 
-      (x.disease || "").toLowerCase().includes(filter.toLowerCase()) || 
-      (x.sector || "").toLowerCase().includes(filter.toLowerCase())
-    );
+    const filterLower = filter.toLowerCase();
+    const filtered = all.filter(x => {
+      const dMatch = (x.disease || "").toLowerCase().includes(filterLower);
+      const sMatch = (x.sector || "").toLowerCase().includes(filterLower);
+      const vMatch = x.variants && x.variants.some(v => 
+        (v.text || "").toLowerCase().includes(filterLower) || 
+        (v.label || "").toLowerCase().includes(filterLower)
+      );
+      return dMatch || sMatch || vMatch;
+    });
     const scoped = sectorFilter ? filtered.filter(x => x.sector === sectorFilter) : filtered;
 
     if (!scoped.length) {
@@ -838,7 +852,15 @@ async function renderPedDiseaseList(filter = "") {
   showLoading();
   try {
     const rawPed = (await window.dbGetBySector("Pediatria"))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()))
+      .filter(p => {
+        const filterLower = filter.toLowerCase();
+        const dMatch = p.disease.toLowerCase().includes(filterLower);
+        const vMatch = p.variants && p.variants.some(v => 
+          (v.text || "").toLowerCase().includes(filterLower) || 
+          (v.label || "").toLowerCase().includes(filterLower)
+        );
+        return dMatch || vMatch;
+      })
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
     const seenPed = new Set();
     const items = rawPed.filter(p => {
@@ -1195,32 +1217,49 @@ function toggleFloatingNote() {
   if (el) el.classList.toggle("open");
 }
 
-function initAnotacoes() {
+let globalNotesState = { homeText: "", homeTime: 0, stickyText: "" };
+
+async function initAnotacoes() {
   const homeNotes = document.getElementById("home-notes");
-  if (homeNotes) {
-    const savedTime = localStorage.getItem("rxmed_notes_time");
-    const savedText = localStorage.getItem("rxmed_notes_text");
-    const now = Date.now();
+  const stickyNote = document.getElementById("sticky-notes-text");
 
-    if (savedTime && (now - parseInt(savedTime) > 172800000)) {
-      localStorage.removeItem("rxmed_notes_text");
-      localStorage.removeItem("rxmed_notes_time");
-      homeNotes.value = "";
-    } else if (savedText) {
-      homeNotes.value = savedText;
+  try {
+    const remoteNotes = await window.dbGetSettings("user_global_notes");
+    if(remoteNotes) {
+      globalNotesState = { ...globalNotesState, ...remoteNotes };
     }
+  } catch(e) {}
 
+  const now = Date.now();
+
+  if (homeNotes) {
+    if (globalNotesState.homeTime && (now - globalNotesState.homeTime > 172800000)) {
+      globalNotesState.homeText = "";
+      globalNotesState.homeTime = 0;
+      window.dbSaveSettings("user_global_notes", globalNotesState);
+    }
+    homeNotes.value = globalNotesState.homeText || "";
+
+    let homeTimeout;
     homeNotes.addEventListener("input", (e) => {
-      localStorage.setItem("rxmed_notes_text", e.target.value);
-      localStorage.setItem("rxmed_notes_time", Date.now().toString());
+      globalNotesState.homeText = e.target.value;
+      globalNotesState.homeTime = Date.now();
+      clearTimeout(homeTimeout);
+      homeTimeout = setTimeout(() => {
+        window.dbSaveSettings("user_global_notes", globalNotesState);
+      }, 1000);
     });
   }
 
-  const stickyNote = document.getElementById("sticky-notes-text");
   if (stickyNote) {
-    stickyNote.value = localStorage.getItem("rxmed_sticky_text") || "";
+    stickyNote.value = globalNotesState.stickyText || "";
+    let stickyTimeout;
     stickyNote.addEventListener("input", (e) => {
-      localStorage.setItem("rxmed_sticky_text", e.target.value);
+      globalNotesState.stickyText = e.target.value;
+      clearTimeout(stickyTimeout);
+      stickyTimeout = setTimeout(() => {
+        window.dbSaveSettings("user_global_notes", globalNotesState);
+      }, 1000);
     });
   }
 }
