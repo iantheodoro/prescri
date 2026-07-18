@@ -111,11 +111,12 @@ async function dbDelete(id) {
 
 // Funções para Salvar Configurações Globais (Anotações na Nuvem)
 async function dbGetSettings(docId) {
+  const sysId = "SYS_" + docId;
   if (isOffline()) {
     try { return JSON.parse(localStorage.getItem("rxmed_set_" + docId)); } catch(e) { return null; }
   }
   try {
-    const snap = await db.collection(SETTINGS_COL).doc(docId).get();
+    const snap = await db.collection(COL).doc(sysId).get();
     if (snap.exists) {
       const data = snap.data();
       localStorage.setItem("rxmed_set_" + docId, JSON.stringify(data));
@@ -128,10 +129,11 @@ async function dbGetSettings(docId) {
 }
 
 async function dbSaveSettings(docId, data) {
+  const sysId = "SYS_" + docId;
   localStorage.setItem("rxmed_set_" + docId, JSON.stringify(data));
   if (!isOffline()) {
     try {
-      await db.collection(SETTINGS_COL).doc(docId).set(data, { merge: true });
+      await db.collection(COL).doc(sysId).set(data, { merge: true });
     } catch(e) {
       console.error("Erro ao salvar settings", e);
     }
