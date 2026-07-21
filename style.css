@@ -2296,24 +2296,37 @@ body.sector-red .rx-image-figure {
 }
 
 /* ── Cmd/Ctrl+G medication marking ─────────────────────── */
-/* Trechos realçados na visualização da prescrição */
-.rx-med-line { margin: 0; padding: 2px 0; }
-.rx-med-plain-line { margin: 0; padding: 2px 0; white-space: pre-wrap; }
+/* Texto da prescrição preservando quebras de linha */
+.rx-med-fulltext {
+  margin: 0;
+  padding: 2px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: transparent;
+  border: 0;
+}
+/* Trechos realçados como medicamento (substring arbitrária) */
 .rx-med-mark {
   background: var(--accent-dim);
   color: var(--text);
-  padding: 2px 6px;
+  padding: 1px 4px;
   border-radius: var(--radius-sm);
-  border: 1px dashed var(--accent);
+  border: 1px solid var(--accent);
   cursor: pointer;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 .rx-med-mark:hover { background: var(--accent-glow); }
-.rx-med-mark.is-picked {
-  background: var(--yellow);
-  color: #1a1a1a;
-  border-style: solid;
-  box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.25);
+/* Trecho removido da prévia amarela: fica esmaecido no texto de cima */
+.rx-med-mark.is-removed {
+  background: transparent;
+  border-style: dashed;
+  color: var(--text-dim);
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 /* Tags de linhas marcadas no editor admin */

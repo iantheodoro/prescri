@@ -224,32 +224,28 @@ function renderVariantContent(idx) {
 }
 
 // Monta a prescrição em texto + a prévia editável em amarelo.
-// Trechos marcados como medicamento aparecem realçados (<mark>). Para
-// incluir/remover na prévia, o médico pode:
+// A prévia amarela mostra a prescrição COMPLETA (para copiar inteira,
+// como antes). Trechos marcados como medicamento aparecem realçados
+// (<mark>) no texto acima. Para remover/reincluir um trecho na prévia
+// amarela o médico pode:
 //   • clicar em cima do trecho realçado, ou
-//   • selecionar qualquer texto e apertar Ctrl/Cmd+G.
+//   • selecionar qualquer texto (arbitrário, não precisa ser linha
+//     inteira) e apertar Ctrl/Cmd+G.
 function renderRxMedPicker(text, medLines) {
   const linesContainer = document.getElementById("rx-med-lines");
   const preview = document.getElementById("rx-med-preview");
   if (!linesContainer || !preview) return;
 
-  const medSet = new Set((medLines || []).map(l => l.trim()).filter(Boolean));
-  const lines = text.split("\n");
+  const chunks = (medLines || []).map(s => String(s)).filter(Boolean);
+  const original = text || "";
 
-  linesContainer.innerHTML = lines.map(line => {
-    const trimmed = line.trim();
-    if (trimmed && medSet.has(trimmed)) {
-      return `<p class="rx-med-line rx-med-marked"><mark class="rx-med-mark" data-line="${escapeHtml(trimmed)}" onclick="toggleRxMedText(this.dataset.line)">${escapeHtml(line)}</mark></p>`;
-    }
-    return `<p class="rx-med-plain-line">${trimmed ? escapeHtml(line) : "&nbsp;"}</p>`;
-  }).join("");
+  // Renderiza o texto completo com os chunks marcados como <mark>.
+  linesContainer.innerHTML = renderMarkedText(original, chunks);
 
-  linesContainer.dataset.medLines = JSON.stringify([...medSet]);
-
-  // Prévia começa só com o texto fixo (não-medicamentos); medicamentos
-  // entram conforme o médico marca via clique ou Ctrl/Cmd+G.
-  const skeleton = lines.filter(l => !medSet.has(l.trim())).join("\n");
-  preview.value = skeleton;
+  // Preserva a prescrição completa como fonte de verdade da prévia.
+  preview.dataset.originalText = original;
+  preview.dataset.removedChunks = JSON.stringify([]);
+  preview.value = original;
 
   // Instala o atalho Ctrl/Cmd+G uma única vez por sessão
   if (!window.__rxMarkKeyBound) {
@@ -258,31 +254,74 @@ function renderRxMedPicker(text, medLines) {
   }
 }
 
-// Alterna a inclusão de um trecho (linha) na prévia amarela
-function toggleRxMedText(rawLine) {
+// Retorna HTML com o texto original e cada chunk envolvido em <mark>.
+// Chunks podem se sobrepor no texto — usamos o intervalo de menor start,
+// e em caso de empate o de maior tamanho.
+function renderMarkedText(text, chunks) {
+  if (!text) return "";
+  const ranges = [];
+  chunks.forEach(chunk => {
+    if (!chunk) return;
+    let from = 0;
+    while (from <= text.length) {
+      const idx = text.indexOf(chunk, from);
+      if (idx === -1) break;
+      ranges.push({ start: idx, end: idx + chunk.length, chunk });
+      from = idx + Math.max(1, chunk.length);
+    }
+  });
+  ranges.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+  let out = "";
+  let cursor = 0;
+  ranges.forEach(r => {
+    if (r.start < cursor) return; // ignora sobreposições
+    out += escapeHtml(text.slice(cursor, r.start));
+    out += `<mark class="rx-med-mark" data-chunk="${escapeHtml(r.chunk)}" onclick="toggleRxMedText(this.dataset.chunk)">${escapeHtml(text.slice(r.start, r.end))}</mark>`;
+    cursor = r.end;
+  });
+  out += escapeHtml(text.slice(cursor));
+  // preserva quebras de linha
+  return `<pre class="rx-med-fulltext">${out}</pre>`;
+}
+
+// Alterna a inclusão de um trecho (substring arbitrária) na prévia amarela.
+// A prévia mantém o texto original completo; trechos "removidos" são
+// tirados da prévia mas continuam realçados no texto acima.
+function toggleRxMedText(rawChunk) {
   const preview = document.getElementById("rx-med-preview");
-  if (!preview || !rawLine) return;
-  const line = String(rawLine).trim();
-  if (!line) return;
+  if (!preview || !rawChunk) return;
+  const chunk = String(rawChunk);
+  if (!chunk) return;
 
-  const value = preview.value;
-  const arr = value.split("\n");
-  const idx = arr.findIndex(l => l.trim() === line);
+  let removed = [];
+  try { removed = JSON.parse(preview.dataset.removedChunks || "[]"); } catch {}
 
-  if (idx !== -1) {
-    arr.splice(idx, 1);
-    preview.value = arr.join("\n");
-  } else {
-    preview.value = value && !value.endsWith("\n") ? `${value}\n${line}` : `${value}${line}`;
-  }
+  const i = removed.indexOf(chunk);
+  const nowRemoved = i === -1;
+  if (nowRemoved) removed.push(chunk);
+  else removed.splice(i, 1);
+  preview.dataset.removedChunks = JSON.stringify(removed);
+
+  // Reconstrói a prévia a partir do texto original, retirando cada
+  // chunk removido (primeira ocorrência de cada).
+  let value = preview.dataset.originalText || "";
+  removed.forEach(c => {
+    const idx = value.indexOf(c);
+    if (idx !== -1) value = value.slice(0, idx) + value.slice(idx + c.length);
+  });
+  // Colapsa linhas em branco duplicadas geradas pela remoção
+  value = value.replace(/\n{3,}/g, "\n\n");
+  preview.value = value;
 
   // Feedback visual nos <mark> correspondentes
-  document.querySelectorAll(`#rx-med-lines .rx-med-mark[data-line="${CSS.escape(line)}"]`).forEach(el => {
-    el.classList.toggle("is-picked", idx === -1);
+  document.querySelectorAll(`#rx-med-lines .rx-med-mark[data-chunk="${CSS.escape(chunk)}"]`).forEach(el => {
+    el.classList.toggle("is-removed", nowRemoved);
   });
 }
 
-// Handler global do atalho Ctrl/Cmd+G na tela de visualização
+// Handler global do atalho Ctrl/Cmd+G na tela de visualização.
+// Usa exatamente a substring selecionada (não expande para linha inteira).
 function handleRxMarkKey(e) {
   const isCombo = (e.key === "g" || e.key === "G") && (e.metaKey || e.ctrlKey);
   if (!isCombo) return;
@@ -291,15 +330,13 @@ function handleRxMarkKey(e) {
 
   const sel = window.getSelection();
   const raw = sel ? sel.toString() : "";
-  if (!raw || !raw.trim()) return;
+  if (!raw) return;
 
-  // Só age se a seleção está dentro do card de prescrição
   const anchor = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
   if (!anchor || !anchor.closest("#rx-med-picker-wrap")) return;
 
   e.preventDefault();
-  // Divide em linhas: cada linha da seleção é adicionada/removida da prévia
-  raw.split("\n").map(l => l.trim()).filter(Boolean).forEach(line => toggleRxMedText(line));
+  toggleRxMedText(raw);
   if (sel.removeAllRanges) sel.removeAllRanges();
 }
 
@@ -599,7 +636,7 @@ function addVariantField(containerId = "variants-container", label = "", text = 
     </div>
     <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)" onkeydown="handleVariantMarkKey(event)">${escapeHtml(text)}</textarea>
     <div class="var-line-picker-wrap">
-      <span class="var-col-label">Selecione o texto que é medicamento e pressione <kbd>Ctrl</kbd>+<kbd>G</kbd> (ou <kbd>⌘</kbd>+<kbd>G</kbd>) para marcar. As linhas marcadas aparecem abaixo.</span>
+      <span class="var-col-label">Selecione qualquer trecho (palavra, parte de linha ou várias linhas) e pressione <kbd>Ctrl</kbd>+<kbd>G</kbd> (ou <kbd>⌘</kbd>+<kbd>G</kbd>) para marcar como medicamento. Os trechos marcados aparecem abaixo.</span>
       <div class="var-line-picker" data-med-lines="[]"></div>
     </div>
     <div class="var-images-block">
@@ -622,11 +659,12 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   return div;
 }
 
-// ── Marcação de linhas de medicamento (na criação/edição) ──────────
-// O médico marca aqui quais linhas do rascunho são medicamentos.
-// Essa marcação é salva junto da variante (medLines) e só vira uma
-// caixinha selecionável de fato depois, na tela de visualização,
-// quando a prescrição for aberta para copiar.
+// ── Marcação de trechos de medicamento (na criação/edição) ─────────
+// O médico seleciona qualquer trecho do rascunho (uma palavra, um
+// pedaço de linha, várias linhas — não precisa ser linha inteira) e
+// pressiona Ctrl/Cmd+G para marcar como medicamento. Essa marcação é
+// salva junto da variante (medLines = array de substrings) e vira o
+// realce clicável na tela de visualização.
 function refreshVariantLinePicker(textarea, presetLines) {
   const block = textarea.closest(".variant-form-group");
   if (!block) return;
@@ -636,15 +674,15 @@ function refreshVariantLinePicker(textarea, presetLines) {
   // Fonte de verdade: array em picker.dataset.medLines (JSON).
   let current;
   if (presetLines && presetLines.length) {
-    current = presetLines.map(l => l.trim()).filter(Boolean);
+    current = presetLines.map(s => String(s)).filter(Boolean);
   } else {
     try { current = JSON.parse(picker.dataset.medLines || "[]"); }
     catch { current = []; }
   }
 
   // Descarta marcações que não existem mais no texto (após edição)
-  const validLines = new Set(textarea.value.split("\n").map(l => l.trim()).filter(Boolean));
-  current = current.filter(l => validLines.has(l));
+  const value = textarea.value;
+  current = current.filter(chunk => chunk && value.indexOf(chunk) !== -1);
   picker.dataset.medLines = JSON.stringify(current);
 
   if (!current.length) {
@@ -652,16 +690,16 @@ function refreshVariantLinePicker(textarea, presetLines) {
     return;
   }
 
-  picker.innerHTML = current.map(line => `
+  picker.innerHTML = current.map(chunk => `
     <span class="var-line-tag">
-      <span class="var-line-text">${escapeHtml(line)}</span>
-      <button type="button" class="var-line-tag-remove" title="Remover marcação" onclick="unmarkVariantLine(this, ${JSON.stringify(line).replace(/"/g,'&quot;')})">✕</button>
+      <span class="var-line-text">${escapeHtml(chunk.replace(/\n/g, " ⏎ "))}</span>
+      <button type="button" class="var-line-tag-remove" title="Remover marcação" onclick="unmarkVariantLine(this, ${JSON.stringify(chunk).replace(/"/g,'&quot;')})">✕</button>
     </span>
   `).join("");
 }
 
-// Remove uma linha marcada (botão ✕ na tag)
-function unmarkVariantLine(btn, line) {
+// Remove um trecho marcado (botão ✕ na tag)
+function unmarkVariantLine(btn, chunk) {
   const block = btn.closest(".variant-form-group");
   if (!block) return;
   const picker = block.querySelector(".var-line-picker");
@@ -669,30 +707,27 @@ function unmarkVariantLine(btn, line) {
   if (!picker || !textarea) return;
   let arr = [];
   try { arr = JSON.parse(picker.dataset.medLines || "[]"); } catch {}
-  arr = arr.filter(l => l !== line);
+  arr = arr.filter(c => c !== chunk);
   picker.dataset.medLines = JSON.stringify(arr);
   refreshVariantLinePicker(textarea);
 }
 
-// Ctrl/Cmd+G dentro do textarea: marca as linhas cobertas pela seleção
+// Ctrl/Cmd+G dentro do textarea: marca EXATAMENTE a substring selecionada
+// como medicamento (sem expandir para linha inteira). Se o mesmo trecho
+// já estiver marcado, o atalho desmarca.
 function handleVariantMarkKey(e) {
   const isCombo = (e.key === "g" || e.key === "G") && (e.metaKey || e.ctrlKey);
   if (!isCombo) return;
   const textarea = e.currentTarget || e.target;
   if (!textarea || textarea.tagName !== "TEXTAREA") return;
 
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  if (start === end) return;
+
   e.preventDefault();
-  const value = textarea.value;
-  let start = textarea.selectionStart;
-  let end = textarea.selectionEnd;
-  if (start === end) return; // nada selecionado
-
-  // Expande para os limites de linha completos
-  while (start > 0 && value[start - 1] !== "\n") start--;
-  while (end < value.length && value[end] !== "\n") end++;
-
-  const selectedLines = value.slice(start, end).split("\n").map(l => l.trim()).filter(Boolean);
-  if (!selectedLines.length) return;
+  const chunk = textarea.value.slice(start, end);
+  if (!chunk) return;
 
   const block = textarea.closest(".variant-form-group");
   const picker = block && block.querySelector(".var-line-picker");
@@ -700,17 +735,13 @@ function handleVariantMarkKey(e) {
 
   let current;
   try { current = JSON.parse(picker.dataset.medLines || "[]"); } catch { current = []; }
-  const set = new Set(current);
-  // Se todas as linhas selecionadas já estão marcadas, o atalho desmarca; senão marca as que faltam.
-  const allMarked = selectedLines.every(l => set.has(l));
-  if (allMarked) {
-    selectedLines.forEach(l => set.delete(l));
-  } else {
-    selectedLines.forEach(l => set.add(l));
-  }
-  picker.dataset.medLines = JSON.stringify([...set]);
+  const i = current.indexOf(chunk);
+  if (i === -1) current.push(chunk);
+  else current.splice(i, 1);
+  picker.dataset.medLines = JSON.stringify(current);
   refreshVariantLinePicker(textarea);
 }
+
 
 // Compat: mantém a função exportada, mas não é mais usada pela UI
 function toggleVariantLineCheck(checkbox) {
