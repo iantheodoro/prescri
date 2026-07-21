@@ -266,18 +266,40 @@ function getBodyTextOffset(node, offset) {
 }
 
 function handleRxSelectionShortcut(e) {
-  // Ctrl+G (Win/Linux) ou Cmd+G (Mac); ignora se estiver editando
+  // Ctrl+G (Win/Linux) ou Cmd+G (Mac)
   const isG = (e.key === "g" || e.key === "G");
   if (!isG) return;
   if (!(e.ctrlKey || e.metaKey)) return;
+  
   const body = getEl("rx-text", "rx-body");
-  if (!body || body.isContentEditable) return;
+  if (!body) return;
+
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
   if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
   if (range.collapsed) return;
+  
   e.preventDefault();
+
+  // Em modo de edição inline, pega diretamente o texto selecionado
+  if (body.isContentEditable) {
+    const selectedText = sel.toString();
+    if (!selectedText) return;
+
+    const out = document.getElementById("rx-build-text");
+    const hint = document.getElementById("rx-build-hint");
+    const card = document.getElementById("rx-build-card");
+
+    const currentText = out.textContent ? out.textContent.trim() : "";
+    out.textContent = currentText ? `${currentText}\n${selectedText}` : selectedText;
+
+    if (card) card.classList.add("has-content");
+    if (hint) hint.style.display = "none";
+    return;
+  }
+
+  // Comportamento normal quando está em modo de visualização
   const start = getBodyTextOffset(range.startContainer, range.startOffset);
   const end = getBodyTextOffset(range.endContainer, range.endOffset);
   if (start < 0 || end < 0 || start === end) return;
