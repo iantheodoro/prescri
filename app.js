@@ -40,24 +40,44 @@ function hideLoading() { document.getElementById("loading").classList.remove("sh
 function showScreen(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   document.getElementById(id).classList.add("active");
+  // Tema visual da Sala Vermelha só deve valer enquanto estivermos dentro
+  // dela; ao voltar para o início, o tema é resetado.
+  if (id === "screen-welcome") document.body.classList.remove("sector-red");
 }
-function goBack(id) { 
-  if (id === 'screen-welcome') document.body.classList.remove("theme-sala-vermelha");
-  showScreen(id); 
-}
+function goBack(id) { showScreen(id); }
 
 async function selectSector(btn) {
   currentSector = btn.dataset.sector;
+  document.body.classList.toggle("sector-red", currentSector === "Sala Vermelha");
   document.getElementById("active-sector-label").textContent = currentSector;
-  
-  if (currentSector === "Sala Vermelha") {
-    document.body.classList.add("theme-sala-vermelha");
-  } else {
-    document.body.classList.remove("theme-sala-vermelha");
-  }
-
   showScreen("screen-disease");
   await renderDiseaseList();
+}
+
+// ── Agrupamento de prescrições por doença ─────────────────
+// Evita que a mesma doença apareça duplicada quando existem vários
+// documentos com o mesmo setor + nome: mescla as variantes num só item.
+function mergeBySameDisease(items) {
+  const map = new Map();
+  const order = [];
+  (items || []).forEach(p => {
+    const key = `${(p.sector || "").trim().toLowerCase()}||${(p.disease || "").trim().toLowerCase()}`;
+    if (!map.has(key)) {
+      map.set(key, { ...p, variants: [...(p.variants || [])] });
+      order.push(key);
+    } else {
+      const existing = map.get(key);
+      const seenSigs = new Set(existing.variants.map(v => `${v.label}||${v.text}`));
+      (p.variants || []).forEach(v => {
+        const sig = `${v.label}||${v.text}`;
+        if (!seenSigs.has(sig)) {
+          existing.variants.push(v);
+          seenSigs.add(sig);
+        }
+      });
+    }
+  });
+  return order.map(k => map.get(k));
 }
 
 async function renderDiseaseList(filter = "") {
@@ -66,42 +86,22 @@ async function renderDiseaseList(filter = "") {
   showLoading();
   try {
     const raw = (await window.dbGetBySector(currentSector))
-      .filter(p => {
-        const filterLower = filter.toLowerCase();
-        const dMatch = (p.disease || "").toLowerCase().includes(filterLower);
-        const textMatch = (p.text || "").toLowerCase().includes(filterLower);
-        const vMatch = p.variants && p.variants.some(v => 
-          (v.text || "").toLowerCase().includes(filterLower) || 
-          (v.label || "").toLowerCase().includes(filterLower)
-        );
-        return dMatch || textMatch || vMatch;
-      })
+      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
+    const items = mergeBySameDisease(raw)
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
-    const seen = new Set();
-    const items = raw.filter(p => {
-      const key = p.disease.trim().toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
 
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhum diagnóstico neste setor.<br/>Use o botão ⚙ administrativo para cadastrar.</div>`;
       return;
     }
 
-    list.innerHTML = items.map(p => {
-      const isContentMatch = filter && !(p.disease || "").toLowerCase().includes(filter.toLowerCase());
-      return `
+    list.innerHTML = items.map(p => `
       <button class="disease-item" onclick="openPrescription('${p.id}')">
         <span class="disease-arrow">→</span>
-        <span class="disease-label" style="display:flex;flex-direction:column;gap:2px;">
-          <span>${p.disease}</span>
-          ${isContentMatch ? `<small style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">⚲ Contém: "${filter}"</small>` : ''}
-        </span>
+        <span class="disease-label">${p.disease}</span>
         ${p.variants && p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} variantes</span>` : ''}
       </button>
-    `}).join("");
+    `).join("");
   } catch (e) {
     list.innerHTML = `<div class="empty-state">Erro ao conectar ao banco. Verifique sua conexão.</div>`;
   } finally {
@@ -110,8 +110,7 @@ async function renderDiseaseList(filter = "") {
 }
 
 function filterDiseases() {
-  const el = document.getElementById("search-input");
-  renderDiseaseList(el ? el.value : "");
+  renderDiseaseList(document.getElementById("disease-search").value);
 }
 
 // ── Visualização de Prescrições e Abas ────────────────────
@@ -435,43 +434,32 @@ async function renderAdminList(filter = "") {
   if (!container) return;
   container.innerHTML = '<div class="empty-state">Carregando...</div>';
   try {
-    const all = await window.dbGetAll();
+    const all = mergeBySameDisease(await window.dbGetAll()).sort((a, b) => {
+      const sec = a.sector.localeCompare(b.sector);
+      if (sec !== 0) return sec;
+      return a.disease.localeCompare(b.disease);
+    });
     const sectorFilter = document.getElementById("admin-sector-filter")?.value || "";
     
-    const filterLower = filter.toLowerCase();
-    const filtered = all.filter(x => {
-      const dMatch = (x.disease || "").toLowerCase().includes(filterLower);
-      const sMatch = (x.sector || "").toLowerCase().includes(filterLower);
-      const textMatch = (x.text || "").toLowerCase().includes(filterLower);
-      const vMatch = x.variants && x.variants.some(v => 
-        (v.text || "").toLowerCase().includes(filterLower) || 
-        (v.label || "").toLowerCase().includes(filterLower)
-      );
-      return dMatch || sMatch || textMatch || vMatch;
-    });
-    const scoped = sectorFilter ? filtered.filter(x => x.sector === sectorFilter) : filtered;
+    const filtered = all.filter(x => 
+      (x.disease || "").toLowerCase().includes(filter.toLowerCase()) || 
+      (x.sector || "").toLowerCase().includes(filter.toLowerCase())
+    );
+    const scoped = sectorFilter
+      ? filtered.filter(x => x.sector === sectorFilter)
+      : filtered;
 
     if (!scoped.length) {
-      container.innerHTML = '<div class="empty-state">Nenhuma prescrição encontrada.</div>';
+      container.innerHTML = '<div class="empty-state">Nenhuma prescrição cadastrada.</div>';
       return;
     }
 
-    const grouped = Object.values(scoped.reduce((acc, p) => {
-      const key = p.disease.trim().toLowerCase() + "-" + p.sector;
-      if (!acc[key]) {
-        acc[key] = { ...p, variantsCount: p.variants ? p.variants.length : 1 };
-      } else {
-        acc[key].variantsCount += p.variants ? p.variants.length : 1;
-      }
-      return acc;
-    }, {})).sort((a, b) => a.disease.localeCompare(b.disease));
-
-    container.innerHTML = grouped.map(p => `
+    container.innerHTML = scoped.map(p => `
       <div class="admin-item">
         <div class="admin-item-info">
           <span class="admin-item-sector">${p.sector}</span>
           <strong class="admin-item-disease">${p.disease}</strong>
-          <span class="admin-item-vcount">${p.variantsCount} variante(s)</span>
+          <span class="admin-item-vcount">${p.variants ? p.variants.length : 1} variante(s)</span>
         </div>
         <button class="btn-edit-item" onclick="startEdit('${p.id}')">Editar</button>
       </div>
@@ -510,6 +498,7 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   container.appendChild(div);
   const imgList = div.querySelector(".var-images-list");
   (images || []).forEach(img => addVariantImageEntry(imgList, img));
+  return div;
 }
 
 // ── Compressão de imagens (mantém tudo no Firestore, sem Storage) ─
@@ -635,6 +624,97 @@ function collectAllVariantsImages(blocks) {
   }));
 }
 
+// ── Buscar doença existente ao criar (evita duplicar por variação) ─
+let addingToExistingId = null;
+
+function prepareAddTab() {
+  cancelAddToExisting();
+}
+
+async function searchExistingDisease() {
+  const input = document.getElementById("add-disease-search");
+  const container = document.getElementById("add-disease-search-results");
+  if (!input || !container) return;
+  const q = input.value.trim().toLowerCase();
+  if (!q) { container.innerHTML = ""; return; }
+
+  container.innerHTML = `<div class="empty-state" style="padding:12px">Buscando...</div>`;
+  try {
+    const all = await window.dbGetAll();
+    const matches = mergeBySameDisease(all)
+      .filter(p => (p.disease || "").toLowerCase().includes(q))
+      .slice(0, 8);
+
+    if (!matches.length) {
+      container.innerHTML = `<div class="empty-state" style="padding:12px">Nenhuma doença encontrada — será criada uma nova.</div>`;
+      return;
+    }
+    container.innerHTML = matches.map(p => `
+      <div class="admin-item">
+        <div class="admin-item-info">
+          <span class="admin-item-sector">${p.sector}</span>
+          <strong class="admin-item-disease">${p.disease}</strong>
+          <span class="admin-item-vcount">${p.variants ? p.variants.length : 0} variante(s)</span>
+        </div>
+        <button type="button" class="btn-edit-item" onclick="selectExistingDisease('${p.id}')">+ Adicionar variante</button>
+      </div>
+    `).join("");
+  } catch(e) {
+    container.innerHTML = `<div class="empty-state" style="padding:12px">Erro ao buscar.</div>`;
+  }
+}
+
+async function selectExistingDisease(id) {
+  showLoading();
+  try {
+    const p = await window.dbGetById(id);
+    if (!p) return;
+    addingToExistingId = id;
+
+    const idField = document.getElementById("add-existing-id");
+    const sectorSel = document.getElementById("add-sector");
+    const diseaseInput = document.getElementById("add-disease");
+    const banner = document.getElementById("add-existing-banner");
+
+    if (idField) idField.value = id;
+    if (sectorSel) { sectorSel.value = p.sector; sectorSel.disabled = true; }
+    if (diseaseInput) { diseaseInput.value = p.disease; diseaseInput.readOnly = true; }
+    if (banner) banner.style.display = "flex";
+    const labelEl = document.getElementById("add-existing-label");
+    if (labelEl) labelEl.textContent = `${p.sector} — ${p.disease}`;
+
+    document.getElementById("add-disease-search").value = "";
+    document.getElementById("add-disease-search-results").innerHTML = "";
+
+    const container = document.getElementById("new-variants-container");
+    container.innerHTML = "";
+    (p.variants || []).forEach(v => addVariantField("new-variants-container", v.label, v.text, v.images));
+    addNewVariantField(); // bloco extra em branco para a nova variante
+  } catch(e) {
+    alert("Erro ao carregar doença.");
+  } finally { hideLoading(); }
+}
+
+function cancelAddToExisting() {
+  addingToExistingId = null;
+  const idField = document.getElementById("add-existing-id");
+  const sectorSel = document.getElementById("add-sector");
+  const diseaseInput = document.getElementById("add-disease");
+  const banner = document.getElementById("add-existing-banner");
+  const searchInput = document.getElementById("add-disease-search");
+  const searchResults = document.getElementById("add-disease-search-results");
+  const container = document.getElementById("new-variants-container");
+
+  if (idField) idField.value = "";
+  if (sectorSel) { sectorSel.disabled = false; sectorSel.value = ""; }
+  if (diseaseInput) { diseaseInput.readOnly = false; diseaseInput.value = ""; }
+  if (banner) banner.style.display = "none";
+  if (searchInput) searchInput.value = "";
+  if (searchResults) searchResults.innerHTML = "";
+  if (container) container.innerHTML = "";
+  addNewVariantField();
+}
+
 async function saveNewPrescription(e) {
   e.preventDefault();
   const form = e.target;
@@ -650,11 +730,31 @@ async function saveNewPrescription(e) {
   showLoading();
   try {
     const variants = await collectAllVariantsImages(blocks);
-    await window.dbAdd({ sector, disease, variants });
+
+    if (addingToExistingId) {
+      // Atualiza a doença já existente, mesclando variantes em vez de duplicar
+      await window.dbUpdate(addingToExistingId, { sector, disease, variants });
+    } else {
+      // Se já existir uma doença com o mesmo nome no mesmo setor, agrupa
+      // as variantes nela em vez de criar um novo documento duplicado.
+      const existingList = await window.dbGetBySector(sector);
+      const match = existingList.find(p => (p.disease || "").trim().toLowerCase() === disease.trim().toLowerCase());
+      if (match) {
+        const seenSigs = new Set((match.variants || []).map(v => `${v.label}||${v.text}`));
+        const mergedVariants = [...(match.variants || [])];
+        variants.forEach(v => {
+          const sig = `${v.label}||${v.text}`;
+          if (!seenSigs.has(sig)) { mergedVariants.push(v); seenSigs.add(sig); }
+        });
+        await window.dbUpdate(match.id, { variants: mergedVariants });
+      } else {
+        await window.dbAdd({ sector, disease, variants });
+      }
+    }
+
     e.target.reset();
-    document.getElementById("new-variants-container").innerHTML = "";
-    addNewVariantField();
-    alert("✓ Prescrição incluída com sucesso!");
+    cancelAddToExisting();
+    alert("✓ Prescrição salva com sucesso!");
     switchTab("tab-list", document.getElementById("tab-list-btn"));
     renderAdminList();
   } catch(err) {
@@ -860,40 +960,20 @@ async function renderPedDiseaseList(filter = "") {
   showLoading();
   try {
     const rawPed = (await window.dbGetBySector("Pediatria"))
-      .filter(p => {
-        const filterLower = filter.toLowerCase();
-        const dMatch = (p.disease || "").toLowerCase().includes(filterLower);
-        const textMatch = (p.text || "").toLowerCase().includes(filterLower);
-        const vMatch = p.variants && p.variants.some(v => 
-          (v.text || "").toLowerCase().includes(filterLower) || 
-          (v.label || "").toLowerCase().includes(filterLower)
-        );
-        return dMatch || textMatch || vMatch;
-      })
+      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
+    const items = mergeBySameDisease(rawPed)
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
-    const seenPed = new Set();
-    const items = rawPed.filter(p => {
-      const key = p.disease.trim().toLowerCase();
-      if (seenPed.has(key)) return false;
-      seenPed.add(key);
-      return true;
-    });
     if (!items.length) {
       list.innerHTML = `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
       return;
     }
-    list.innerHTML = items.map(p => {
-      const isContentMatch = filter && !(p.disease || "").toLowerCase().includes(filter.toLowerCase());
-      return `
+    list.innerHTML = items.map(p => `
       <button class="disease-item" onclick="openPrescription('${p.id}')">
         <span class="disease-arrow">→</span>
-        <span class="disease-label" style="display:flex;flex-direction:column;gap:2px;">
-          <span>${p.disease}</span>
-          ${isContentMatch ? `<small style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">⚲ Contém: "${filter}"</small>` : ''}
-        </span>
+        <span class="disease-label">${p.disease}</span>
         ${p.variants && p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} variantes</span>` : ''}
       </button>
-    `}).join("");
+    `).join("");
   } catch(e) {
     list.innerHTML = `<div class="empty-state">Erro ao carregar diagnósticos pediátricos.</div>`;
   } finally { hideLoading(); }
@@ -1219,63 +1299,9 @@ Object.assign(window, {
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, addNewVariantField, addVariantFieldEdit,
+  mergeBySameDisease, prepareAddTab, searchExistingDisease, selectExistingDisease, cancelAddToExisting,
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
   openPediatria, switchPedTab, calculateDose, copyPedResult, filterPedDiseases, updatePediatricPrescriptionContext,
-  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
-  toggleFloatingNote
+  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview
 });
-
-function toggleFloatingNote() {
-  const el = document.getElementById("floating-alert-note");
-  if (el) el.classList.toggle("open");
-}
-
-let globalNotesState = { homeText: "", homeTime: 0, stickyText: "" };
-
-async function initAnotacoes() {
-  const homeNotes = document.getElementById("home-notes");
-  const stickyNote = document.getElementById("sticky-notes-text");
-
-  try {
-    const remoteNotes = await window.dbGetSettings("user_global_notes");
-    if(remoteNotes) {
-      globalNotesState = { ...globalNotesState, ...remoteNotes };
-    }
-  } catch(e) {}
-
-  const now = Date.now();
-
-  if (homeNotes) {
-    if (globalNotesState.homeTime && (now - globalNotesState.homeTime > 172800000)) {
-      globalNotesState.homeText = "";
-      globalNotesState.homeTime = 0;
-      window.dbSaveSettings("user_global_notes", globalNotesState);
-    }
-    homeNotes.value = globalNotesState.homeText || "";
-
-    let homeTimeout;
-    homeNotes.addEventListener("input", (e) => {
-      globalNotesState.homeText = e.target.value;
-      globalNotesState.homeTime = Date.now();
-      clearTimeout(homeTimeout);
-      homeTimeout = setTimeout(() => {
-        window.dbSaveSettings("user_global_notes", globalNotesState);
-      }, 1000);
-    });
-  }
-
-  if (stickyNote) {
-    stickyNote.value = globalNotesState.stickyText || "";
-    let stickyTimeout;
-    stickyNote.addEventListener("input", (e) => {
-      globalNotesState.stickyText = e.target.value;
-      clearTimeout(stickyTimeout);
-      stickyTimeout = setTimeout(() => {
-        window.dbSaveSettings("user_global_notes", globalNotesState);
-      }, 1000);
-    });
-  }
-}
-
-document.addEventListener("DOMContentLoaded", initAnotacoes);

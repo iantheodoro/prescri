@@ -1979,64 +1979,181 @@ html, body {
 }
 .ped-placeholder-icon { font-size: 40px; }
 
-/* ── Tema Dinâmico: Sala Vermelha ──────────────────────── */
-body.theme-sala-vermelha {
-  --border: var(--red);
-  --accent: var(--red);
-  --accent-dim: var(--red-dim);
+/* ============================================================
+   TEMA SALA VERMELHA — traçados em vermelho
+   ============================================================ */
+body.sector-red .disease-item {
+  border-color: var(--red);
 }
-body.theme-sala-vermelha .disease-item,
-body.theme-sala-vermelha .rx-card,
-body.theme-sala-vermelha .rx-image-figure,
-body.theme-sala-vermelha .sector-card,
-body.theme-sala-vermelha .btn-back,
-body.theme-sala-vermelha .btn-admin {
+body.sector-red .disease-item:hover {
+  border-color: var(--red);
+  background: var(--red-dim);
+}
+body.sector-red .disease-arrow,
+body.sector-red .disease-item:hover .disease-arrow {
+  color: var(--red);
+}
+body.sector-red .search-wrap input:focus {
+  border-color: var(--red);
+}
+body.sector-red .sector-badge {
+  background: var(--red-dim);
+  border-color: var(--red);
+  color: var(--red);
+}
+body.sector-red .rx-card {
+  border-color: var(--red);
+}
+body.sector-red .rx-tag {
+  color: var(--red);
+  background: var(--red-dim);
+  border-color: var(--red);
+}
+body.sector-red .variant-tab.active {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+body.sector-red .variant-tab:hover {
+  border-color: var(--red);
+  color: var(--text);
+}
+body.sector-red .rx-image-figure {
   border-color: var(--red);
 }
 
-/* ── Anotações da Tela Inicial (48h) ───────────────────── */
-.home-notes-container {
-  width: 100%; max-width: 720px;
-  margin-top: 32px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
+/* ============================================================
+   ANOTAÇÕES — notas rápidas que expiram em 48h
+   ============================================================ */
+.sector-card-notas {
+  border-color: rgba(245, 200, 66, 0.4);
 }
-.home-notes-header {
-  margin-bottom: 12px; color: var(--text-muted); 
-  font-family: var(--font-mono); font-size: 11px; 
-  text-transform: uppercase; letter-spacing: 1px;
-}
-.home-notes-textarea {
-  width: 100%; background: transparent; border: none; 
-  color: var(--text); font-family: var(--font-body); 
-  font-size: 14px; outline: none; resize: vertical; min-height: 80px;
+.sector-card-notas:hover {
+  border-color: var(--yellow);
+  background: rgba(245, 200, 66, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 32px rgba(245, 200, 66, 0.22);
 }
 
-/* ── Post-it Flutuante Amarelo (Cuidado) ───────────────── */
-.floating-alert-note {
-  position: fixed; right: 24px; bottom: 24px; z-index: 1000;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+.notas-content {
+  position: relative; z-index: 2;
+  padding: 32px 24px 60px;
+  max-width: 760px; width: 100%; margin: 0 auto;
 }
-.btn-floating-note {
-  background: #fbbf24; border: none; border-radius: 50%;
-  width: 50px; height: 50px; font-size: 22px; cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-  display: flex; align-items: center; justify-content: center;
-  transition: transform 0.2s;
+
+.notas-hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 22px;
 }
-.btn-floating-note:hover { transform: scale(1.1); }
-.floating-note-content {
-  display: none;
-  width: 260px; height: 200px;
-  background: #fef9c3; border: 2px solid #fbbf24; 
-  border-radius: 8px; padding: 14px; 
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+
+.notas-input-row {
+  display: flex; gap: 10px;
+  align-items: stretch;
+  margin-bottom: 28px;
 }
-.floating-alert-note.open .floating-note-content { display: block; }
-.floating-note-content textarea {
-  width: 100%; height: 100%; background: transparent; border: none;
-  color: #111; font-family: var(--font-body); font-size: 14px;
-  outline: none; resize: none;
+
+.notas-input-row textarea {
+  flex: 1;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  padding: 12px 14px;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+.notas-input-row textarea:focus { border-color: var(--yellow); }
+
+.btn-add-nota {
+  background: rgba(245, 200, 66, 0.15);
+  border: 1px solid var(--yellow);
+  color: var(--yellow);
+  font-family: var(--font-body);
+  font-weight: 700; font-size: 13px;
+  padding: 0 18px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+}
+.btn-add-nota:hover { background: var(--yellow); color: #100c00; }
+
+/* Notas alinhadas no canto direito, em amarelo, com símbolo de cuidado */
+.notas-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.nota-card {
+  position: relative;
+  width: 100%; max-width: 340px;
+  background: rgba(245, 200, 66, 0.1);
+  border: 1.5px solid rgba(245, 200, 66, 0.45);
+  border-radius: var(--radius-sm);
+  padding: 20px 16px 14px;
+  min-height: 92px;
+  animation: modal-slide 0.25s ease;
+}
+
+.nota-warning {
+  position: absolute; top: 10px; right: 34px;
+  font-size: 15px;
+  color: var(--yellow);
+}
+
+.nota-delete {
+  position: absolute; top: 8px; right: 8px;
+  background: none; border: none;
+  color: rgba(245, 200, 66, 0.6);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s;
+}
+.nota-delete:hover { color: var(--red); }
+
+.nota-text {
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 10px;
+  padding-right: 20px;
+}
+
+.nota-expiry {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: rgba(245, 200, 66, 0.75);
+}
+
+@media (max-width: 600px) {
+  .notas-input-row { flex-direction: column; }
+  .btn-add-nota { padding: 12px 18px; }
+  .nota-card { max-width: 100%; }
+}
+
+/* ============================================================
+   BANNER — adicionando variante a doença existente
+   ============================================================ */
+.add-existing-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
 }
