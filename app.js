@@ -270,26 +270,28 @@ function handleRxSelectionShortcut(e) {
   const isG = (e.key === "g" || e.key === "G");
   if (!isG) return;
   if (!(e.ctrlKey || e.metaKey)) return;
-  
+
   const body = getEl("rx-text", "rx-body");
   if (!body) return;
 
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
+  
+  // Verifica se a seleção está dentro do texto da prescrição
   if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
   if (range.collapsed) return;
-  
+
   e.preventDefault();
 
-  // Em modo de edição inline, pega diretamente o texto selecionado
-  if (body.isContentEditable) {
-    const selectedText = sel.toString();
-    if (!selectedText) return;
+  const out = document.getElementById("rx-build-text");
+  const hint = document.getElementById("rx-build-hint");
+  const card = document.getElementById("rx-build-card");
 
-    const out = document.getElementById("rx-build-text");
-    const hint = document.getElementById("rx-build-hint");
-    const card = document.getElementById("rx-build-card");
+  // Quando está EDITANDO (contentEditable): pega o texto selecionado e acrescenta
+  if (body.isContentEditable) {
+    const selectedText = sel.toString().trim();
+    if (!selectedText) return;
 
     const currentText = out.textContent ? out.textContent.trim() : "";
     out.textContent = currentText ? `${currentText}\n${selectedText}` : selectedText;
@@ -299,7 +301,7 @@ function handleRxSelectionShortcut(e) {
     return;
   }
 
-  // Comportamento normal quando está em modo de visualização
+  // Quando está VISUALIZANDO: mantemos a lógica de marcar/desmarcar o intervalo
   const start = getBodyTextOffset(range.startContainer, range.startOffset);
   const end = getBodyTextOffset(range.endContainer, range.endOffset);
   if (start < 0 || end < 0 || start === end) return;
@@ -308,6 +310,7 @@ function handleRxSelectionShortcut(e) {
   toggleBuiltRange(s, eOff);
   sel.removeAllRanges();
 }
+
 
 function toggleBuiltRange(s, e) {
   // Se a nova seleção está totalmente contida em um chunk existente, remove-o.
@@ -332,26 +335,28 @@ function toggleBuiltRange(s, e) {
   renderBuiltRx();
 }
 
-function handleRxMarkClick(e) {
-  const mark = e.target.closest("mark.rx-picked");
-  if (!mark) return;
-  const body = getEl("rx-text", "rx-body");
-  if (!body || body.isContentEditable) return;
-  e.preventDefault();
-  // Localiza offset baseado no texto acumulado até o mark
-  let count = 0;
-  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
-  let n;
-  let markStart = -1;
-  let markLen = mark.textContent.length;
-  while ((n = walker.nextNode())) {
-    if (mark.contains(n)) { markStart = count; break; }
-    count += n.nodeValue.length;
+function renderBuiltRx() {
+  const out = document.getElementById("rx-build-text");
+  const hint = document.getElementById("rx-build-hint");
+  const card = document.getElementById("rx-build-card");
+  if (!out) return;
+
+  if (!builtChunks.length && !out.textContent.trim()) {
+    out.textContent = "";
+    if (card) card.classList.remove("has-content");
+    if (hint) hint.style.display = "block";
+    return;
   }
-  if (markStart < 0) return;
-  const s = markStart;
-  const eOff = markStart + markLen;
-  toggleBuiltRange(s, eOff);
+
+  // Só atualiza se o usuário não tiver inserido textos manuais durante edição
+  if (builtChunks.length > 0) {
+    const ranges = [...builtChunks].sort((a, b) => a.start - b.start);
+    const parts = ranges.map(r => rxBaseText.slice(r.start, r.end));
+    out.textContent = parts.join("\n");
+  }
+
+  if (card) card.classList.add("has-content");
+  if (hint) hint.style.display = "none";
 }
 
 function clearBuiltRx() {

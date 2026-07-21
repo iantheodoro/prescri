@@ -37,13 +37,6 @@
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento</p>
 
-      <div class="sector-grid sector-grid-special" style="max-width:720px;margin-bottom:8px">
-        <button class="sector-card sector-card-notas" onclick="openNotas()">
-          <div class="sector-icon">📝</div>
-          <div class="sector-name">Anotações</div>
-          <div class="sector-desc">Notas rápidas · somem em 48h</div>
-        </button>
-      </div>
 
       <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
@@ -77,6 +70,10 @@
           <div class="sector-name">Enfermaria</div>
           <div class="sector-desc">Cuidados gerais / internação</div>
         </button>
+      </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Eletrocardiograma</div>
+      <div class="sector-grid sector-grid-special">
         <button class="sector-card sector-card-special" data-sector="ECG" onclick="selectSector(this)">
           <div class="sector-icon">📈</div>
           <div class="sector-name">ECG</div>
@@ -97,6 +94,15 @@
           <div class="sector-desc">Infusão bidirecional por peso</div>
         </button>
       </div>
+
+            <div class="sector-grid sector-grid-special" style="max-width:720px;margin-bottom:8px">
+        <button class="sector-card sector-card-notas" onclick="openNotas()">
+          <div class="sector-icon">📝</div>
+          <div class="sector-name">Anotações</div>
+          <div class="sector-desc">Notas rápidas · somem em 48h</div>
+        </button>
+      </div>
+      
     </div>
   </div>
 
@@ -177,7 +183,7 @@
             </button>
           </div>
         </div>
-        <pre class="rx-build-text" id="rx-build-text"></pre>
+        <pre class="rx-build-text" id="rx-build-text" contenteditable="true" spellcheck="false"></pre>
         <div class="copy-feedback" id="build-copy-feedback">✓ Copiado!</div>
       </div>
     </div>
