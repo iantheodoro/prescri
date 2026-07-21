@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260721-2" />
+  <link rel="stylesheet" href="style.css?v=20260721-3" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -59,16 +59,12 @@
           <div class="sector-name">Enfermaria</div>
           <div class="sector-desc">Cuidados gerais / internação</div>
         </button>
-      </div>
-
-      <div class="sector-group-label" style="margin-top:28px">Populações Especiais</div>
-      <div class="sector-grid sector-grid-special">
-        <button class="sector-card sector-card-special" onclick="openPediatria()">
+        <button class="sector-card" onclick="openPediatria()">
           <div class="sector-icon">👶</div>
           <div class="sector-name">Pediatria</div>
           <div class="sector-desc">Calculadora de doses + prescrições</div>
         </button>
-        <button class="sector-card sector-card-special" data-sector="GO" onclick="selectSector(this)">
+        <button class="sector-card" data-sector="GO" onclick="selectSector(this)">
           <div class="sector-icon">🤰</div>
           <div class="sector-name">GO</div>
           <div class="sector-desc">Ginecologia e Obstetrícia</div>
@@ -539,10 +535,10 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260721-2"></script>
-  <script src="pediatria.js?v=20260721-2"></script>
-  <script src="db.js?v=20260721-2"></script>
-  <script src="notas.js?v=20260721-2"></script>
-  <script src="app.js?v=20260721-2"></script>
+  <script src="shortcuts.js?v=20260721-3"></script>
+  <script src="pediatria.js?v=20260721-3"></script>
+  <script src="db.js?v=20260721-3"></script>
+  <script src="notas.js?v=20260721-3"></script>
+  <script src="app.js?v=20260721-3"></script>
 </body>
 </html>
