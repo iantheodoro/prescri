@@ -482,9 +482,19 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   div.innerHTML = `
     <div class="variant-form-header variant-edit-header">
       <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label variant-label-input" value="${escapeHtml(label)}" required />
-      <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.parentElement.parentElement.remove()">✕ Remover</button>
+      <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.closest('.variant-form-group').remove()">✕ Remover</button>
     </div>
-    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required>${escapeHtml(text)}</textarea>
+    <div class="var-split-editor">
+      <div class="var-draft-col">
+        <label class="var-col-label">Rascunho · marque a caixinha do que é medicamento</label>
+        <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)">${escapeHtml(text)}</textarea>
+        <div class="var-line-picker"></div>
+      </div>
+      <div class="var-preview-col">
+        <label class="var-col-label">Pré-visualização da prescrição</label>
+        <textarea rows="10" class="var-preview-text" placeholder="Marque as caixinhas ao lado para montar a prescrição final aqui...">${escapeHtml(text)}</textarea>
+      </div>
+    </div>
     <div class="var-images-block">
       <div class="var-images-head">
         <span>Imagens</span>
@@ -498,7 +508,70 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   container.appendChild(div);
   const imgList = div.querySelector(".var-images-list");
   (images || []).forEach(img => addVariantImageEntry(imgList, img));
+
+  const draftArea = div.querySelector(".var-text");
+  if (draftArea) refreshVariantLinePicker(draftArea);
+
   return div;
+}
+
+// ── Seleção de linhas de medicamento (caixinhas) + prévia editável ─
+// Ao digitar no rascunho, cada linha não-vazia vira uma caixinha
+// selecionável. Marcar/desmarcar adiciona ou remove essa linha da
+// pré-visualização editável (com borda amarela), sem apagar o que
+// o médico já ajustou manualmente ali.
+function refreshVariantLinePicker(textarea) {
+  const block = textarea.closest(".variant-form-group");
+  if (!block) return;
+  const picker = block.querySelector(".var-line-picker");
+  if (!picker) return;
+
+  const previousChecked = new Set(
+    [...picker.querySelectorAll(".var-line-check:checked")].map(c => c.dataset.line)
+  );
+
+  const lines = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
+  if (!lines.length) {
+    picker.innerHTML = "";
+    return;
+  }
+
+  picker.innerHTML = lines.map(line => {
+    const checked = previousChecked.has(line);
+    return `
+      <label class="var-line-row ${checked ? 'checked' : ''}">
+        <input type="checkbox" class="var-line-check" data-line="${escapeHtml(line)}" ${checked ? "checked" : ""} onchange="toggleVariantLine(this)" />
+        <span class="var-line-text">${escapeHtml(line)}</span>
+      </label>
+    `;
+  }).join("");
+}
+
+function toggleVariantLine(checkbox) {
+  const row = checkbox.closest(".var-line-row");
+  if (row) row.classList.toggle("checked", checkbox.checked);
+
+  const block = checkbox.closest(".variant-form-group");
+  const preview = block?.querySelector(".var-preview-text");
+  if (!preview) return;
+
+  const line = checkbox.dataset.line || "";
+  let value = preview.value;
+
+  if (checkbox.checked) {
+    const already = value.split("\n").some(l => l.trim() === line.trim());
+    if (!already) {
+      value = value && !value.endsWith("\n") ? `${value}\n${line}` : `${value}${line}`;
+    }
+  } else {
+    const linesArr = value.split("\n");
+    const idx = linesArr.findIndex(l => l.trim() === line.trim());
+    if (idx !== -1) {
+      linesArr.splice(idx, 1);
+      value = linesArr.join("\n");
+    }
+  }
+  preview.value = value;
 }
 
 // ── Compressão de imagens (mantém tudo no Firestore, sem Storage) ─
@@ -617,11 +690,16 @@ function collectVariantImages(block) {
 }
 
 function collectAllVariantsImages(blocks) {
-  return [...blocks].map(b => ({
-    label: b.querySelector(".var-label").value,
-    text: b.querySelector(".var-text").value,
-    images: collectVariantImages(b)
-  }));
+  return [...blocks].map(b => {
+    const previewEl = b.querySelector(".var-preview-text");
+    const draftEl = b.querySelector(".var-text");
+    const text = (previewEl && previewEl.value.trim() !== "") ? previewEl.value : (draftEl ? draftEl.value : "");
+    return {
+      label: b.querySelector(".var-label").value,
+      text,
+      images: collectVariantImages(b)
+    };
+  });
 }
 
 // ── Buscar doença existente ao criar (evita duplicar por variação) ─
@@ -1299,6 +1377,7 @@ Object.assign(window, {
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, addNewVariantField, addVariantFieldEdit,
+  refreshVariantLinePicker, toggleVariantLine,
   mergeBySameDisease, prepareAddTab, searchExistingDisease, selectExistingDisease, cancelAddToExisting,
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,

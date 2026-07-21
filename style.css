@@ -2157,3 +2157,110 @@ body.sector-red .rx-image-figure {
   padding: 10px 14px;
   border-radius: var(--radius-sm);
 }
+
+/* ============================================================
+   EDITOR DIVIDIDO — rascunho com caixinhas de medicamento
+   + pré-visualização editável (borda amarela)
+   ============================================================ */
+.var-split-editor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.var-col-label {
+  display: block;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.var-draft-col, .var-preview-col {
+  display: flex; flex-direction: column;
+}
+
+/* Caixinhas selecionáveis por linha, combinando com o design do app */
+.var-line-picker {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 10px;
+  max-height: 220px; overflow-y: auto;
+  padding-right: 2px;
+}
+
+.var-line-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.var-line-row:hover { border-color: var(--accent); }
+
+.var-line-row.checked {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.var-line-check {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; min-width: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-hi);
+  background: var(--bg);
+  cursor: pointer;
+  position: relative;
+  margin-top: 2px;
+  transition: all 0.2s;
+}
+
+.var-line-check:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.var-line-check:checked::after {
+  content: "✓";
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #050a07;
+}
+
+.var-line-text {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Pré-visualização editável, com borda amarela */
+.var-preview-text {
+  width: 100%;
+  min-height: 260px;
+  background: rgba(245, 200, 66, 0.06);
+  border: 1.5px solid var(--yellow);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 12px 14px;
+  outline: none;
+  resize: vertical;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.var-preview-text:focus {
+  border-color: var(--yellow);
+  box-shadow: 0 0 0 3px rgba(245, 200, 66, 0.16);
+}
+
+@media (max-width: 700px) {
+  .var-split-editor { grid-template-columns: 1fr; }
+}
