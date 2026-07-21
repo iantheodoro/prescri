@@ -2184,17 +2184,33 @@ body.sector-red .rx-image-figure {
 }
 
 /* ── Realce da seleção incorporada à receita ───────────── */
+/* Estado "marcado" (Cmd/Ctrl+G): apenas indica que é clicável, sem parecer
+   que já foi adicionado à receita montada. */
 #rx-text mark.rx-picked,
 #rx-body mark.rx-picked {
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: transparent;
+  color: inherit;
+  border: 1.5px solid var(--accent);
   border-radius: 4px;
   padding: 0 2px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 #rx-text mark.rx-picked:hover,
 #rx-body mark.rx-picked:hover {
+  background: var(--accent-dim);
+}
+
+/* Estado "adicionado" (clicado na hora de prescrever): agora sim preenchido,
+   confirmando que está na receita montada. */
+#rx-text mark.rx-picked.active-selected,
+#rx-body mark.rx-picked.active-selected {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+#rx-text mark.rx-picked.active-selected:hover,
+#rx-body mark.rx-picked.active-selected:hover {
   background: var(--accent-glow);
 }
 
