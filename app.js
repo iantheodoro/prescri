@@ -223,57 +223,84 @@ function renderVariantContent(idx) {
   renderRxImageGallery(v.images);
 }
 
-// Monta a coluna de caixinhas (medicamentos) + a prévia editável em amarelo
+// Monta a prescrição em texto + a prévia editável em amarelo.
+// Trechos marcados como medicamento aparecem realçados (<mark>). Para
+// incluir/remover na prévia, o médico pode:
+//   • clicar em cima do trecho realçado, ou
+//   • selecionar qualquer texto e apertar Ctrl/Cmd+G.
 function renderRxMedPicker(text, medLines) {
-  const medSet = new Set(medLines);
-  const lines = text.split("\n");
   const linesContainer = document.getElementById("rx-med-lines");
   const preview = document.getElementById("rx-med-preview");
   if (!linesContainer || !preview) return;
 
+  const medSet = new Set((medLines || []).map(l => l.trim()).filter(Boolean));
+  const lines = text.split("\n");
+
   linesContainer.innerHTML = lines.map(line => {
     const trimmed = line.trim();
     if (trimmed && medSet.has(trimmed)) {
-      return `
-        <label class="var-line-row">
-          <input type="checkbox" class="var-line-check" data-line="${escapeHtml(trimmed)}" onchange="toggleRxMedLine(this)" />
-          <span class="var-line-text">${escapeHtml(line)}</span>
-        </label>
-      `;
+      return `<p class="rx-med-line rx-med-marked"><mark class="rx-med-mark" data-line="${escapeHtml(trimmed)}" onclick="toggleRxMedText(this.dataset.line)">${escapeHtml(line)}</mark></p>`;
     }
     return `<p class="rx-med-plain-line">${trimmed ? escapeHtml(line) : "&nbsp;"}</p>`;
   }).join("");
 
-  // A prévia começa só com o texto fixo (instruções etc.); os medicamentos
-  // entram conforme o médico marca a caixinha correspondente para este paciente.
+  linesContainer.dataset.medLines = JSON.stringify([...medSet]);
+
+  // Prévia começa só com o texto fixo (não-medicamentos); medicamentos
+  // entram conforme o médico marca via clique ou Ctrl/Cmd+G.
   const skeleton = lines.filter(l => !medSet.has(l.trim())).join("\n");
   preview.value = skeleton;
+
+  // Instala o atalho Ctrl/Cmd+G uma única vez por sessão
+  if (!window.__rxMarkKeyBound) {
+    document.addEventListener("keydown", handleRxMarkKey);
+    window.__rxMarkKeyBound = true;
+  }
 }
 
-function toggleRxMedLine(checkbox) {
-  const row = checkbox.closest(".var-line-row");
-  if (row) row.classList.toggle("checked", checkbox.checked);
-
+// Alterna a inclusão de um trecho (linha) na prévia amarela
+function toggleRxMedText(rawLine) {
   const preview = document.getElementById("rx-med-preview");
-  if (!preview) return;
+  if (!preview || !rawLine) return;
+  const line = String(rawLine).trim();
+  if (!line) return;
 
-  const line = checkbox.dataset.line || "";
-  let value = preview.value;
+  const value = preview.value;
+  const arr = value.split("\n");
+  const idx = arr.findIndex(l => l.trim() === line);
 
-  if (checkbox.checked) {
-    const already = value.split("\n").some(l => l.trim() === line.trim());
-    if (!already) {
-      value = value && !value.endsWith("\n") ? `${value}\n${line}` : `${value}${line}`;
-    }
+  if (idx !== -1) {
+    arr.splice(idx, 1);
+    preview.value = arr.join("\n");
   } else {
-    const arr = value.split("\n");
-    const idx = arr.findIndex(l => l.trim() === line.trim());
-    if (idx !== -1) {
-      arr.splice(idx, 1);
-      value = arr.join("\n");
-    }
+    preview.value = value && !value.endsWith("\n") ? `${value}\n${line}` : `${value}${line}`;
   }
-  preview.value = value;
+
+  // Feedback visual nos <mark> correspondentes
+  document.querySelectorAll(`#rx-med-lines .rx-med-mark[data-line="${CSS.escape(line)}"]`).forEach(el => {
+    el.classList.toggle("is-picked", idx === -1);
+  });
+}
+
+// Handler global do atalho Ctrl/Cmd+G na tela de visualização
+function handleRxMarkKey(e) {
+  const isCombo = (e.key === "g" || e.key === "G") && (e.metaKey || e.ctrlKey);
+  if (!isCombo) return;
+  const pickerWrap = document.getElementById("rx-med-picker-wrap");
+  if (!pickerWrap || pickerWrap.style.display === "none") return;
+
+  const sel = window.getSelection();
+  const raw = sel ? sel.toString() : "";
+  if (!raw || !raw.trim()) return;
+
+  // Só age se a seleção está dentro do card de prescrição
+  const anchor = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+  if (!anchor || !anchor.closest("#rx-med-picker-wrap")) return;
+
+  e.preventDefault();
+  // Divide em linhas: cada linha da seleção é adicionada/removida da prévia
+  raw.split("\n").map(l => l.trim()).filter(Boolean).forEach(line => toggleRxMedText(line));
+  if (sel.removeAllRanges) sel.removeAllRanges();
 }
 
 // Renderiza a galeria de imagens da variante (ex: traçados de ECG)
@@ -570,10 +597,10 @@ function addVariantField(containerId = "variants-container", label = "", text = 
       <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label variant-label-input" value="${escapeHtml(label)}" required />
       <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.closest('.variant-form-group').remove()">✕ Remover</button>
     </div>
-    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)">${escapeHtml(text)}</textarea>
+    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)" onkeydown="handleVariantMarkKey(event)">${escapeHtml(text)}</textarea>
     <div class="var-line-picker-wrap">
-      <span class="var-col-label">Marque quais linhas são medicamento · a caixinha de seleção aparecerá para o médico quando ele abrir a prescrição para copiar</span>
-      <div class="var-line-picker"></div>
+      <span class="var-col-label">Selecione o texto que é medicamento e pressione <kbd>Ctrl</kbd>+<kbd>G</kbd> (ou <kbd>⌘</kbd>+<kbd>G</kbd>) para marcar. As linhas marcadas aparecem abaixo.</span>
+      <div class="var-line-picker" data-med-lines="[]"></div>
     </div>
     <div class="var-images-block">
       <div class="var-images-head">
@@ -606,27 +633,86 @@ function refreshVariantLinePicker(textarea, presetLines) {
   const picker = block.querySelector(".var-line-picker");
   if (!picker) return;
 
-  const previousChecked = (presetLines && presetLines.length)
-    ? new Set(presetLines.map(l => l.trim()))
-    : new Set([...picker.querySelectorAll(".var-line-check:checked")].map(c => c.dataset.line));
+  // Fonte de verdade: array em picker.dataset.medLines (JSON).
+  let current;
+  if (presetLines && presetLines.length) {
+    current = presetLines.map(l => l.trim()).filter(Boolean);
+  } else {
+    try { current = JSON.parse(picker.dataset.medLines || "[]"); }
+    catch { current = []; }
+  }
 
-  const lines = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
-  if (!lines.length) {
-    picker.innerHTML = "";
+  // Descarta marcações que não existem mais no texto (após edição)
+  const validLines = new Set(textarea.value.split("\n").map(l => l.trim()).filter(Boolean));
+  current = current.filter(l => validLines.has(l));
+  picker.dataset.medLines = JSON.stringify(current);
+
+  if (!current.length) {
+    picker.innerHTML = `<span class="var-line-empty">Nenhum medicamento marcado ainda.</span>`;
     return;
   }
 
-  picker.innerHTML = lines.map(line => {
-    const checked = previousChecked.has(line);
-    return `
-      <label class="var-line-row ${checked ? 'checked' : ''}">
-        <input type="checkbox" class="var-line-check" data-line="${escapeHtml(line)}" ${checked ? "checked" : ""} onchange="toggleVariantLineCheck(this)" />
-        <span class="var-line-text">${escapeHtml(line)}</span>
-      </label>
-    `;
-  }).join("");
+  picker.innerHTML = current.map(line => `
+    <span class="var-line-tag">
+      <span class="var-line-text">${escapeHtml(line)}</span>
+      <button type="button" class="var-line-tag-remove" title="Remover marcação" onclick="unmarkVariantLine(this, ${JSON.stringify(line).replace(/"/g,'&quot;')})">✕</button>
+    </span>
+  `).join("");
 }
 
+// Remove uma linha marcada (botão ✕ na tag)
+function unmarkVariantLine(btn, line) {
+  const block = btn.closest(".variant-form-group");
+  if (!block) return;
+  const picker = block.querySelector(".var-line-picker");
+  const textarea = block.querySelector(".var-text");
+  if (!picker || !textarea) return;
+  let arr = [];
+  try { arr = JSON.parse(picker.dataset.medLines || "[]"); } catch {}
+  arr = arr.filter(l => l !== line);
+  picker.dataset.medLines = JSON.stringify(arr);
+  refreshVariantLinePicker(textarea);
+}
+
+// Ctrl/Cmd+G dentro do textarea: marca as linhas cobertas pela seleção
+function handleVariantMarkKey(e) {
+  const isCombo = (e.key === "g" || e.key === "G") && (e.metaKey || e.ctrlKey);
+  if (!isCombo) return;
+  const textarea = e.currentTarget || e.target;
+  if (!textarea || textarea.tagName !== "TEXTAREA") return;
+
+  e.preventDefault();
+  const value = textarea.value;
+  let start = textarea.selectionStart;
+  let end = textarea.selectionEnd;
+  if (start === end) return; // nada selecionado
+
+  // Expande para os limites de linha completos
+  while (start > 0 && value[start - 1] !== "\n") start--;
+  while (end < value.length && value[end] !== "\n") end++;
+
+  const selectedLines = value.slice(start, end).split("\n").map(l => l.trim()).filter(Boolean);
+  if (!selectedLines.length) return;
+
+  const block = textarea.closest(".variant-form-group");
+  const picker = block && block.querySelector(".var-line-picker");
+  if (!picker) return;
+
+  let current;
+  try { current = JSON.parse(picker.dataset.medLines || "[]"); } catch { current = []; }
+  const set = new Set(current);
+  // Se todas as linhas selecionadas já estão marcadas, o atalho desmarca; senão marca as que faltam.
+  const allMarked = selectedLines.every(l => set.has(l));
+  if (allMarked) {
+    selectedLines.forEach(l => set.delete(l));
+  } else {
+    selectedLines.forEach(l => set.add(l));
+  }
+  picker.dataset.medLines = JSON.stringify([...set]);
+  refreshVariantLinePicker(textarea);
+}
+
+// Compat: mantém a função exportada, mas não é mais usada pela UI
 function toggleVariantLineCheck(checkbox) {
   const row = checkbox.closest(".var-line-row");
   if (row) row.classList.toggle("checked", checkbox.checked);
@@ -751,9 +837,12 @@ function collectAllVariantsImages(blocks) {
   return [...blocks].map(b => {
     const draftEl = b.querySelector(".var-text");
     const text = draftEl ? draftEl.value : "";
-    const medLines = [...b.querySelectorAll(".var-line-check:checked")]
-      .map(c => c.dataset.line)
-      .filter(Boolean);
+    let medLines = [];
+    try {
+      const picker = b.querySelector(".var-line-picker");
+      if (picker && picker.dataset.medLines) medLines = JSON.parse(picker.dataset.medLines);
+    } catch { medLines = []; }
+    medLines = (medLines || []).map(l => String(l).trim()).filter(Boolean);
     return {
       label: b.querySelector(".var-label").value,
       text,
@@ -1432,13 +1521,17 @@ function calculateSedacao() {
     note.textContent = presentation.helper;
   });
 }
+// Compat: mantida para não quebrar chamadas legadas em HTML.
+function toggleRxMedLine(checkbox) {
+  if (checkbox && checkbox.dataset && checkbox.dataset.line) toggleRxMedText(checkbox.dataset.line);
+}
 // ── Exportação Amarrada para o Escopo Global ──────────────
 Object.assign(window, {
   selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, addNewVariantField, addVariantFieldEdit,
-  refreshVariantLinePicker, toggleVariantLineCheck, toggleRxMedLine, renderRxMedPicker,
+  refreshVariantLinePicker, toggleVariantLineCheck, toggleRxMedLine, renderRxMedPicker, toggleRxMedText, handleRxMarkKey, handleVariantMarkKey, unmarkVariantLine,
   mergeBySameDisease, prepareAddTab, searchExistingDisease, selectExistingDisease, cancelAddToExisting,
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,

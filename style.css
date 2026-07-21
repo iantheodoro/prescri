@@ -2294,3 +2294,58 @@ body.sector-red .rx-image-figure {
 @media (max-width: 700px) {
   .rx-med-picker-wrap { grid-template-columns: 1fr; }
 }
+
+/* ── Cmd/Ctrl+G medication marking ─────────────────────── */
+/* Trechos realçados na visualização da prescrição */
+.rx-med-line { margin: 0; padding: 2px 0; }
+.rx-med-plain-line { margin: 0; padding: 2px 0; white-space: pre-wrap; }
+.rx-med-mark {
+  background: var(--accent-dim);
+  color: var(--text);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--accent);
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.rx-med-mark:hover { background: var(--accent-glow); }
+.rx-med-mark.is-picked {
+  background: var(--yellow);
+  color: #1a1a1a;
+  border-style: solid;
+  box-shadow: 0 0 0 2px rgba(245, 200, 66, 0.25);
+}
+
+/* Tags de linhas marcadas no editor admin */
+.var-line-picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.var-line-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 4px 8px 4px 10px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  max-width: 100%;
+}
+.var-line-tag .var-line-text {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 340px;
+}
+.var-line-tag-remove {
+  background: transparent; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px;
+}
+.var-line-tag-remove:hover { color: var(--red); }
+.var-line-empty { color: var(--text-dim); font-size: 12.5px; font-style: italic; }
+.var-col-label kbd {
+  display: inline-block;
+  background: var(--bg3);
+  border: 1px solid var(--border-hi);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text);
+  margin: 0 1px;
+}
