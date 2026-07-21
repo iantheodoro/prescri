@@ -277,40 +277,36 @@ function handleRxSelectionShortcut(e) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const range = sel.getRangeAt(0);
-  
-  // Verifica se a seleção está dentro do texto da prescrição
+
   if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
   if (range.collapsed) return;
 
   e.preventDefault();
 
-  const out = document.getElementById("rx-build-text");
-  const hint = document.getElementById("rx-build-hint");
-  const card = document.getElementById("rx-build-card");
+  // Aplica a marcação verde (<mark class="rx-picked">) via comando do editor de texto
+  // Isso funciona tanto em modo normal quanto em modo de edição (contentEditable)
+  const selectedText = sel.toString();
+  if (!selectedText) return;
 
-  // Quando está EDITANDO (contentEditable): pega o texto selecionado e acrescenta
-  if (body.isContentEditable) {
-    const selectedText = sel.toString().trim();
-    if (!selectedText) return;
+  // Executa o envelopamento com a classe css 'rx-picked'
+  const mark = document.createElement("mark");
+  mark.className = "rx-picked";
+  mark.textContent = selectedText;
 
-    const currentText = out.textContent ? out.textContent.trim() : "";
-    out.textContent = currentText ? `${currentText}\n${selectedText}` : selectedText;
-
-    if (card) card.classList.add("has-content");
-    if (hint) hint.style.display = "none";
-    return;
-  }
-
-  // Quando está VISUALIZANDO: mantemos a lógica de marcar/desmarcar o intervalo
-  const start = getBodyTextOffset(range.startContainer, range.startOffset);
-  const end = getBodyTextOffset(range.endContainer, range.endOffset);
-  if (start < 0 || end < 0 || start === end) return;
-  const s = Math.min(start, end);
-  const eOff = Math.max(start, end);
-  toggleBuiltRange(s, eOff);
+  range.deleteContents();
+  range.insertNode(mark);
   sel.removeAllRanges();
+
+  // Se o usuário marcou algo, já disponibiliza para a lógica da receita montada
+  syncEditableBaseText();
 }
 
+function syncEditableBaseText() {
+  const body = getEl("rx-text", "rx-body");
+  if (body) {
+    rxBaseText = body.innerText;
+  }
+}
 
 function toggleBuiltRange(s, e) {
   // Se a nova seleção está totalmente contida em um chunk existente, remove-o.
@@ -385,6 +381,43 @@ if (typeof window !== "undefined" && !window.__rxBuilderWired) {
       handleRxMarkClick(e);
     }
   });
+}
+
+function handleRxMarkClick(e) {
+  const mark = e.target.closest("mark.rx-picked");
+  if (!mark) return;
+
+  const body = getEl("rx-text", "rx-body");
+  if (!body) return;
+
+  e.preventDefault();
+
+  const out = document.getElementById("rx-build-text");
+  const hint = document.getElementById("rx-build-hint");
+  const card = document.getElementById("rx-build-card");
+  if (!out) return;
+
+  const textToAdd = mark.textContent.trim();
+  let currentLines = out.textContent ? out.textContent.split("\n").filter(Boolean) : [];
+
+  // Se já está na receita montada, ao clicar ele remove; se não está, adiciona
+  if (currentLines.includes(textToAdd)) {
+    currentLines = currentLines.filter(line => line !== textToAdd);
+    mark.classList.remove("active-selected");
+  } else {
+    currentLines.push(textToAdd);
+    mark.classList.add("active-selected");
+  }
+
+  out.textContent = currentLines.join("\n");
+
+  if (currentLines.length > 0) {
+    if (card) card.classList.add("has-content");
+    if (hint) hint.style.display = "none";
+  } else {
+    if (card) card.classList.remove("has-content");
+    if (hint) hint.style.display = "block";
+  }
 }
 
 // Renderiza a galeria de imagens da variante (ex: traçados de ECG)
