@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260721-1" />
+  <link rel="stylesheet" href="style.css?v=20260721-2" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -36,14 +36,6 @@
       <div class="logo-badge">RX</div>
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento</p>
-
-      <div class="sector-grid sector-grid-special" style="max-width:720px;margin-bottom:8px">
-        <button class="sector-card sector-card-notas" onclick="openNotas()">
-          <div class="sector-icon">📝</div>
-          <div class="sector-name">Anotações</div>
-          <div class="sector-desc">Notas rápidas · somem em 48h</div>
-        </button>
-      </div>
 
       <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
@@ -103,6 +95,15 @@
           <div class="sector-icon">💧</div>
           <div class="sector-name">Sedação contínua</div>
           <div class="sector-desc">Infusão bidirecional por peso</div>
+        </button>
+      </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Anotações</div>
+      <div class="sector-grid sector-grid-special">
+        <button class="sector-card sector-card-notas" onclick="openNotas()">
+          <div class="sector-icon">📝</div>
+          <div class="sector-name">Anotações</div>
+          <div class="sector-desc">Notas rápidas · somem em 48h</div>
         </button>
       </div>
     </div>
@@ -538,10 +539,10 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260721-1"></script>
-  <script src="pediatria.js?v=20260721-1"></script>
-  <script src="db.js?v=20260721-1"></script>
-  <script src="notas.js?v=20260721-1"></script>
-  <script src="app.js?v=20260721-1"></script>
+  <script src="shortcuts.js?v=20260721-2"></script>
+  <script src="pediatria.js?v=20260721-2"></script>
+  <script src="db.js?v=20260721-2"></script>
+  <script src="notas.js?v=20260721-2"></script>
+  <script src="app.js?v=20260721-2"></script>
 </body>
 </html>
