@@ -2159,26 +2159,18 @@ body.sector-red .rx-image-figure {
 }
 
 /* ============================================================
-   EDITOR DIVIDIDO — rascunho com caixinhas de medicamento
-   + pré-visualização editável (borda amarela)
+   MARCAÇÃO DE MEDICAMENTOS (formulário de criação/edição)
    ============================================================ */
-.var-split-editor {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-top: 4px;
-}
-
 .var-col-label {
   display: block;
   font-size: 10px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 1px;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  line-height: 1.5;
 }
 
-.var-draft-col, .var-preview-col {
-  display: flex; flex-direction: column;
+.var-line-picker-wrap {
+  margin-top: 4px;
 }
 
 /* Caixinhas selecionáveis por linha, combinando com o design do app */
@@ -2239,7 +2231,44 @@ body.sector-red .rx-image-figure {
   word-break: break-word;
 }
 
-/* Pré-visualização editável, com borda amarela */
+/* ============================================================
+   TELA DE VISUALIZAÇÃO/CÓPIA — caixinhas de medicamento
+   + prescrição final editável (borda amarela)
+   ============================================================ */
+.rx-med-picker-wrap {
+  display: none;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.rx-med-col, .rx-med-preview-col {
+  display: flex; flex-direction: column;
+}
+
+.rx-med-preview-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.rx-med-lines {
+  display: flex; flex-direction: column; gap: 6px;
+  margin-top: 10px;
+}
+
+.rx-med-plain-line {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 2px 12px;
+}
+
+/* Prévia/prescrição final editável, com borda amarela */
 .var-preview-text {
   width: 100%;
   min-height: 260px;
@@ -2251,6 +2280,7 @@ body.sector-red .rx-image-figure {
   font-size: 13px;
   line-height: 1.7;
   padding: 12px 14px;
+  margin-top: 10px;
   outline: none;
   resize: vertical;
   transition: box-shadow 0.2s, border-color 0.2s;
@@ -2262,5 +2292,5 @@ body.sector-red .rx-image-figure {
 }
 
 @media (max-width: 700px) {
-  .var-split-editor { grid-template-columns: 1fr; }
+  .rx-med-picker-wrap { grid-template-columns: 1fr; }
 }

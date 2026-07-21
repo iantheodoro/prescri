@@ -180,7 +180,14 @@ function renderVariantContent(idx) {
   const body = getEl("rx-text", "rx-body");
   if (!body) return;
   const v = currentPrescription.variants && currentPrescription.variants[idx];
+  const pickerWrap = document.getElementById("rx-med-picker-wrap");
+  const cardEl = document.querySelector(".screen.active .rx-card") || document.querySelector(".rx-card");
+  const editBtn = getEl("btn-rx-edit", "btn-edit-rx");
+
   if (!v) {
+    if (pickerWrap) pickerWrap.style.display = "none";
+    if (cardEl) cardEl.style.display = "";
+    if (editBtn) editBtn.style.display = "inline-flex";
     body.innerHTML = "Nenhum texto disponível.";
     renderRxImageGallery(null);
     return;
@@ -193,8 +200,80 @@ function renderVariantContent(idx) {
     text = applyPediatricMarkers(text);
   }
 
-  body.innerText = text;
+  const rawMedLines = (v.medLines || []).filter(Boolean);
+  const medLines = isPediatricPrescription()
+    ? rawMedLines.map(l => applyPediatricMarkers(l).trim()).filter(Boolean)
+    : rawMedLines.map(l => l.trim()).filter(Boolean);
+
+  if (medLines.length) {
+    // A prescrição tem medicamentos marcados na criação: mostra as
+    // caixinhas de seleção + a prescrição final editável (borda amarela)
+    if (cardEl) cardEl.style.display = "none";
+    if (editBtn) editBtn.style.display = "none";
+    if (pickerWrap) pickerWrap.style.display = "grid";
+    renderRxMedPicker(text, medLines);
+    body.innerText = text; // mantém disponível como fallback (ex: cópia legada)
+  } else {
+    if (pickerWrap) pickerWrap.style.display = "none";
+    if (cardEl) cardEl.style.display = "";
+    if (editBtn) editBtn.style.display = "inline-flex";
+    body.innerText = text;
+  }
+
   renderRxImageGallery(v.images);
+}
+
+// Monta a coluna de caixinhas (medicamentos) + a prévia editável em amarelo
+function renderRxMedPicker(text, medLines) {
+  const medSet = new Set(medLines);
+  const lines = text.split("\n");
+  const linesContainer = document.getElementById("rx-med-lines");
+  const preview = document.getElementById("rx-med-preview");
+  if (!linesContainer || !preview) return;
+
+  linesContainer.innerHTML = lines.map(line => {
+    const trimmed = line.trim();
+    if (trimmed && medSet.has(trimmed)) {
+      return `
+        <label class="var-line-row">
+          <input type="checkbox" class="var-line-check" data-line="${escapeHtml(trimmed)}" onchange="toggleRxMedLine(this)" />
+          <span class="var-line-text">${escapeHtml(line)}</span>
+        </label>
+      `;
+    }
+    return `<p class="rx-med-plain-line">${trimmed ? escapeHtml(line) : "&nbsp;"}</p>`;
+  }).join("");
+
+  // A prévia começa só com o texto fixo (instruções etc.); os medicamentos
+  // entram conforme o médico marca a caixinha correspondente para este paciente.
+  const skeleton = lines.filter(l => !medSet.has(l.trim())).join("\n");
+  preview.value = skeleton;
+}
+
+function toggleRxMedLine(checkbox) {
+  const row = checkbox.closest(".var-line-row");
+  if (row) row.classList.toggle("checked", checkbox.checked);
+
+  const preview = document.getElementById("rx-med-preview");
+  if (!preview) return;
+
+  const line = checkbox.dataset.line || "";
+  let value = preview.value;
+
+  if (checkbox.checked) {
+    const already = value.split("\n").some(l => l.trim() === line.trim());
+    if (!already) {
+      value = value && !value.endsWith("\n") ? `${value}\n${line}` : `${value}${line}`;
+    }
+  } else {
+    const arr = value.split("\n");
+    const idx = arr.findIndex(l => l.trim() === line.trim());
+    if (idx !== -1) {
+      arr.splice(idx, 1);
+      value = arr.join("\n");
+    }
+  }
+  preview.value = value;
 }
 
 // Renderiza a galeria de imagens da variante (ex: traçados de ECG)
@@ -394,9 +473,16 @@ async function saveRxInlineEdit() {
 }
 
 function copyPrescription() {
-  const body = getEl("rx-text", "rx-body");
-  if (!body) return;
-  const text = body.innerText;
+  const pickerWrap = document.getElementById("rx-med-picker-wrap");
+  let text;
+  if (pickerWrap && pickerWrap.style.display !== "none") {
+    const preview = document.getElementById("rx-med-preview");
+    text = preview ? preview.value : "";
+  } else {
+    const body = getEl("rx-text", "rx-body");
+    if (!body) return;
+    text = body.innerText;
+  }
   navigator.clipboard.writeText(text).then(() => {
     const feedback = document.getElementById("copy-feedback");
     feedback.classList.add("show");
@@ -474,7 +560,7 @@ function filterAdminList() {
 }
 
 // ── Fluxos de Inclusão e Edição Estrutural no Form ────────
-function addVariantField(containerId = "variants-container", label = "", text = "", images = []) {
+function addVariantField(containerId = "variants-container", label = "", text = "", images = [], medLines = []) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const div = document.createElement("div");
@@ -484,16 +570,10 @@ function addVariantField(containerId = "variants-container", label = "", text = 
       <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label variant-label-input" value="${escapeHtml(label)}" required />
       <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.closest('.variant-form-group').remove()">✕ Remover</button>
     </div>
-    <div class="var-split-editor">
-      <div class="var-draft-col">
-        <label class="var-col-label">Rascunho · marque a caixinha do que é medicamento</label>
-        <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)">${escapeHtml(text)}</textarea>
-        <div class="var-line-picker"></div>
-      </div>
-      <div class="var-preview-col">
-        <label class="var-col-label">Pré-visualização da prescrição</label>
-        <textarea rows="10" class="var-preview-text" placeholder="Marque as caixinhas ao lado para montar a prescrição final aqui...">${escapeHtml(text)}</textarea>
-      </div>
+    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)">${escapeHtml(text)}</textarea>
+    <div class="var-line-picker-wrap">
+      <span class="var-col-label">Marque quais linhas são medicamento · a caixinha de seleção aparecerá para o médico quando ele abrir a prescrição para copiar</span>
+      <div class="var-line-picker"></div>
     </div>
     <div class="var-images-block">
       <div class="var-images-head">
@@ -510,25 +590,25 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   (images || []).forEach(img => addVariantImageEntry(imgList, img));
 
   const draftArea = div.querySelector(".var-text");
-  if (draftArea) refreshVariantLinePicker(draftArea);
+  if (draftArea) refreshVariantLinePicker(draftArea, medLines);
 
   return div;
 }
 
-// ── Seleção de linhas de medicamento (caixinhas) + prévia editável ─
-// Ao digitar no rascunho, cada linha não-vazia vira uma caixinha
-// selecionável. Marcar/desmarcar adiciona ou remove essa linha da
-// pré-visualização editável (com borda amarela), sem apagar o que
-// o médico já ajustou manualmente ali.
-function refreshVariantLinePicker(textarea) {
+// ── Marcação de linhas de medicamento (na criação/edição) ──────────
+// O médico marca aqui quais linhas do rascunho são medicamentos.
+// Essa marcação é salva junto da variante (medLines) e só vira uma
+// caixinha selecionável de fato depois, na tela de visualização,
+// quando a prescrição for aberta para copiar.
+function refreshVariantLinePicker(textarea, presetLines) {
   const block = textarea.closest(".variant-form-group");
   if (!block) return;
   const picker = block.querySelector(".var-line-picker");
   if (!picker) return;
 
-  const previousChecked = new Set(
-    [...picker.querySelectorAll(".var-line-check:checked")].map(c => c.dataset.line)
-  );
+  const previousChecked = (presetLines && presetLines.length)
+    ? new Set(presetLines.map(l => l.trim()))
+    : new Set([...picker.querySelectorAll(".var-line-check:checked")].map(c => c.dataset.line));
 
   const lines = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
   if (!lines.length) {
@@ -540,38 +620,16 @@ function refreshVariantLinePicker(textarea) {
     const checked = previousChecked.has(line);
     return `
       <label class="var-line-row ${checked ? 'checked' : ''}">
-        <input type="checkbox" class="var-line-check" data-line="${escapeHtml(line)}" ${checked ? "checked" : ""} onchange="toggleVariantLine(this)" />
+        <input type="checkbox" class="var-line-check" data-line="${escapeHtml(line)}" ${checked ? "checked" : ""} onchange="toggleVariantLineCheck(this)" />
         <span class="var-line-text">${escapeHtml(line)}</span>
       </label>
     `;
   }).join("");
 }
 
-function toggleVariantLine(checkbox) {
+function toggleVariantLineCheck(checkbox) {
   const row = checkbox.closest(".var-line-row");
   if (row) row.classList.toggle("checked", checkbox.checked);
-
-  const block = checkbox.closest(".variant-form-group");
-  const preview = block?.querySelector(".var-preview-text");
-  if (!preview) return;
-
-  const line = checkbox.dataset.line || "";
-  let value = preview.value;
-
-  if (checkbox.checked) {
-    const already = value.split("\n").some(l => l.trim() === line.trim());
-    if (!already) {
-      value = value && !value.endsWith("\n") ? `${value}\n${line}` : `${value}${line}`;
-    }
-  } else {
-    const linesArr = value.split("\n");
-    const idx = linesArr.findIndex(l => l.trim() === line.trim());
-    if (idx !== -1) {
-      linesArr.splice(idx, 1);
-      value = linesArr.join("\n");
-    }
-  }
-  preview.value = value;
 }
 
 // ── Compressão de imagens (mantém tudo no Firestore, sem Storage) ─
@@ -691,12 +749,15 @@ function collectVariantImages(block) {
 
 function collectAllVariantsImages(blocks) {
   return [...blocks].map(b => {
-    const previewEl = b.querySelector(".var-preview-text");
     const draftEl = b.querySelector(".var-text");
-    const text = (previewEl && previewEl.value.trim() !== "") ? previewEl.value : (draftEl ? draftEl.value : "");
+    const text = draftEl ? draftEl.value : "";
+    const medLines = [...b.querySelectorAll(".var-line-check:checked")]
+      .map(c => c.dataset.line)
+      .filter(Boolean);
     return {
       label: b.querySelector(".var-label").value,
       text,
+      medLines,
       images: collectVariantImages(b)
     };
   });
@@ -766,7 +827,7 @@ async function selectExistingDisease(id) {
 
     const container = document.getElementById("new-variants-container");
     container.innerHTML = "";
-    (p.variants || []).forEach(v => addVariantField("new-variants-container", v.label, v.text, v.images));
+    (p.variants || []).forEach(v => addVariantField("new-variants-container", v.label, v.text, v.images, v.medLines));
     addNewVariantField(); // bloco extra em branco para a nova variante
   } catch(e) {
     alert("Erro ao carregar doença.");
@@ -860,7 +921,7 @@ async function startEdit(id) {
     container.innerHTML = "";
     
     if (p.variants && p.variants.length) {
-      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text, v.images));
+      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text, v.images, v.medLines));
     } else {
       addVariantField("variants-container", "Padrão", p.text || "");
     }
@@ -1377,7 +1438,7 @@ Object.assign(window, {
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, addNewVariantField, addVariantFieldEdit,
-  refreshVariantLinePicker, toggleVariantLine,
+  refreshVariantLinePicker, toggleVariantLineCheck, toggleRxMedLine, renderRxMedPicker,
   mergeBySameDisease, prepareAddTab, searchExistingDisease, selectExistingDisease, cancelAddToExisting,
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,

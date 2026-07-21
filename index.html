@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260721-4" />
+  <link rel="stylesheet" href="style.css?v=20260721-5" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -152,6 +152,16 @@
         </div>
       </div>
       <div id="rx-image-gallery" class="rx-image-gallery"></div>
+      <div id="rx-med-picker-wrap" class="rx-med-picker-wrap">
+        <div class="rx-med-col">
+          <span class="var-col-label">Texto da prescrição · marque os medicamentos</span>
+          <div class="rx-med-lines" id="rx-med-lines"></div>
+        </div>
+        <div class="rx-med-preview-col">
+          <span class="var-col-label">Prescrição final <span class="rx-med-preview-hint">(editável)</span></span>
+          <textarea id="rx-med-preview" class="var-preview-text" placeholder="Marque os medicamentos ao lado para montar a prescrição deste paciente..."></textarea>
+        </div>
+      </div>
       <div class="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -535,10 +545,10 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260721-4"></script>
-  <script src="pediatria.js?v=20260721-4"></script>
-  <script src="db.js?v=20260721-4"></script>
-  <script src="notas.js?v=20260721-4"></script>
-  <script src="app.js?v=20260721-4"></script>
+  <script src="shortcuts.js?v=20260721-5"></script>
+  <script src="pediatria.js?v=20260721-5"></script>
+  <script src="db.js?v=20260721-5"></script>
+  <script src="notas.js?v=20260721-5"></script>
+  <script src="app.js?v=20260721-5"></script>
 </body>
 </html>
