@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260721-5" />
+  <link rel="stylesheet" href="style.css?v=20260721-1" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -37,6 +37,14 @@
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento</p>
 
+      <div class="sector-grid sector-grid-special" style="max-width:720px;margin-bottom:8px">
+        <button class="sector-card sector-card-notas" onclick="openNotas()">
+          <div class="sector-icon">📝</div>
+          <div class="sector-name">Anotações</div>
+          <div class="sector-desc">Notas rápidas · somem em 48h</div>
+        </button>
+      </div>
+
       <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
         <button class="sector-card" data-sector="Sala Verde" onclick="selectSector(this)">
@@ -59,12 +67,16 @@
           <div class="sector-name">Enfermaria</div>
           <div class="sector-desc">Cuidados gerais / internação</div>
         </button>
-        <button class="sector-card" onclick="openPediatria()">
+      </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Populações Especiais</div>
+      <div class="sector-grid sector-grid-special">
+        <button class="sector-card sector-card-special" onclick="openPediatria()">
           <div class="sector-icon">👶</div>
           <div class="sector-name">Pediatria</div>
           <div class="sector-desc">Calculadora de doses + prescrições</div>
         </button>
-        <button class="sector-card" data-sector="GO" onclick="selectSector(this)">
+        <button class="sector-card sector-card-special" data-sector="GO" onclick="selectSector(this)">
           <div class="sector-icon">🤰</div>
           <div class="sector-name">GO</div>
           <div class="sector-desc">Ginecologia e Obstetrícia</div>
@@ -91,15 +103,6 @@
           <div class="sector-icon">💧</div>
           <div class="sector-name">Sedação contínua</div>
           <div class="sector-desc">Infusão bidirecional por peso</div>
-        </button>
-      </div>
-
-      <div class="sector-group-label" style="margin-top:28px">Anotações</div>
-      <div class="sector-grid sector-grid-special">
-        <button class="sector-card sector-card-notas" onclick="openNotas()">
-          <div class="sector-icon">📝</div>
-          <div class="sector-name">Anotações</div>
-          <div class="sector-desc">Notas rápidas · somem em 48h</div>
         </button>
       </div>
     </div>
@@ -152,16 +155,6 @@
         </div>
       </div>
       <div id="rx-image-gallery" class="rx-image-gallery"></div>
-      <div id="rx-med-picker-wrap" class="rx-med-picker-wrap">
-        <div class="rx-med-col">
-          <span class="var-col-label">Texto da prescrição · marque os medicamentos</span>
-          <div class="rx-med-lines" id="rx-med-lines"></div>
-        </div>
-        <div class="rx-med-preview-col">
-          <span class="var-col-label">Prescrição final <span class="rx-med-preview-hint">(editável)</span></span>
-          <textarea id="rx-med-preview" class="var-preview-text" placeholder="Marque os medicamentos ao lado para montar a prescrição deste paciente..."></textarea>
-        </div>
-      </div>
       <div class="rx-card">
         <div class="rx-card-header">
           <span class="rx-symbol">℞</span>
@@ -175,6 +168,25 @@
         </button>
         <button class="btn-rx-edit" id="btn-rx-edit" onclick="editCurrentPrescription()">✎ Editar</button>
         <div class="copy-feedback" id="copy-feedback">✓ Copiado!</div>
+      </div>
+
+      <div class="rx-build-hint" id="rx-build-hint">
+        Selecione trechos do texto acima e pressione <kbd>Ctrl</kbd>+<kbd>G</kbd>
+        (ou <kbd>⌘</kbd>+<kbd>G</kbd>) para montar a receita abaixo.
+      </div>
+
+      <div class="rx-build-card" id="rx-build-card">
+        <div class="rx-build-header">
+          <span class="rx-build-tag">RECEITA MONTADA</span>
+          <div class="rx-build-actions">
+            <button class="btn-build-clear" id="btn-build-clear" onclick="clearBuiltRx()">Limpar</button>
+            <button class="btn-build-copy" id="btn-build-copy" onclick="copyBuiltRx()">
+              <span class="copy-icon">⎘</span> Copiar montagem
+            </button>
+          </div>
+        </div>
+        <pre class="rx-build-text" id="rx-build-text"></pre>
+        <div class="copy-feedback" id="build-copy-feedback">✓ Copiado!</div>
       </div>
     </div>
   </div>
@@ -375,8 +387,9 @@
       </div>
 
       <div id="tab-list" class="tab-content active">
-        <div class="admin-filter">
-          <select id="admin-sector-filter" onchange="renderAdminList()">
+        <div class="admin-filter admin-filter-row">
+          <input type="text" id="admin-search" placeholder="🔎 Buscar por doença ou setor..." oninput="filterAdminList()" />
+          <select id="admin-sector-filter" onchange="filterAdminList()">
             <option value="">Todos os setores</option>
             <option value="Sala Verde">Sala Verde</option>
             <option value="Sala Vermelha">Sala Vermelha</option>
@@ -545,10 +558,10 @@
     </div>
   </div>
 
-  <script src="shortcuts.js?v=20260721-5"></script>
-  <script src="pediatria.js?v=20260721-5"></script>
-  <script src="db.js?v=20260721-5"></script>
-  <script src="notas.js?v=20260721-5"></script>
-  <script src="app.js?v=20260721-5"></script>
+  <script src="shortcuts.js?v=20260721-1"></script>
+  <script src="pediatria.js?v=20260721-1"></script>
+  <script src="db.js?v=20260721-1"></script>
+  <script src="notas.js?v=20260721-1"></script>
+  <script src="app.js?v=20260721-1"></script>
 </body>
 </html>

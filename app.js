@@ -180,14 +180,7 @@ function renderVariantContent(idx) {
   const body = getEl("rx-text", "rx-body");
   if (!body) return;
   const v = currentPrescription.variants && currentPrescription.variants[idx];
-  const pickerWrap = document.getElementById("rx-med-picker-wrap");
-  const cardEl = document.querySelector(".screen.active .rx-card") || document.querySelector(".rx-card");
-  const editBtn = getEl("btn-rx-edit", "btn-edit-rx");
-
   if (!v) {
-    if (pickerWrap) pickerWrap.style.display = "none";
-    if (cardEl) cardEl.style.display = "";
-    if (editBtn) editBtn.style.display = "inline-flex";
     body.innerHTML = "Nenhum texto disponível.";
     renderRxImageGallery(null);
     return;
@@ -200,144 +193,171 @@ function renderVariantContent(idx) {
     text = applyPediatricMarkers(text);
   }
 
-  const rawMedLines = (v.medLines || []).filter(Boolean);
-  const medLines = isPediatricPrescription()
-    ? rawMedLines.map(l => applyPediatricMarkers(l).trim()).filter(Boolean)
-    : rawMedLines.map(l => l.trim()).filter(Boolean);
-
-  if (medLines.length) {
-    // A prescrição tem medicamentos marcados na criação: mostra as
-    // caixinhas de seleção + a prescrição final editável (borda amarela)
-    if (cardEl) cardEl.style.display = "none";
-    if (editBtn) editBtn.style.display = "none";
-    if (pickerWrap) pickerWrap.style.display = "grid";
-    renderRxMedPicker(text, medLines);
-    body.innerText = text; // mantém disponível como fallback (ex: cópia legada)
-  } else {
-    if (pickerWrap) pickerWrap.style.display = "none";
-    if (cardEl) cardEl.style.display = "";
-    if (editBtn) editBtn.style.display = "inline-flex";
-    body.innerText = text;
-  }
-
+  rxBaseText = text;
+  builtChunks = [];
+  renderRxBody();
+  renderBuiltRx();
   renderRxImageGallery(v.images);
 }
 
-// Monta a prescrição em texto + a prévia editável em amarelo.
-// A prévia amarela mostra a prescrição COMPLETA (para copiar inteira,
-// como antes). Trechos marcados como medicamento aparecem realçados
-// (<mark>) no texto acima. Para remover/reincluir um trecho na prévia
-// amarela o médico pode:
-//   • clicar em cima do trecho realçado, ou
-//   • selecionar qualquer texto (arbitrário, não precisa ser linha
-//     inteira) e apertar Ctrl/Cmd+G.
-function renderRxMedPicker(text, medLines) {
-  const linesContainer = document.getElementById("rx-med-lines");
-  const preview = document.getElementById("rx-med-preview");
-  if (!linesContainer || !preview) return;
+// ── Montagem incremental da receita via seleção (Ctrl/Cmd+G) ─────
+let rxBaseText = "";
+let builtChunks = []; // array de { start, end } sobre rxBaseText
 
-  const chunks = (medLines || []).map(s => String(s)).filter(Boolean);
-  const original = text || "";
-
-  // Renderiza o texto completo com os chunks marcados como <mark>.
-  linesContainer.innerHTML = renderMarkedText(original, chunks);
-
-  // Preserva a prescrição completa como fonte de verdade da prévia.
-  preview.dataset.originalText = original;
-  preview.dataset.removedChunks = JSON.stringify([]);
-  preview.value = original;
-
-  // Instala o atalho Ctrl/Cmd+G uma única vez por sessão
-  if (!window.__rxMarkKeyBound) {
-    document.addEventListener("keydown", handleRxMarkKey);
-    window.__rxMarkKeyBound = true;
+function renderRxBody() {
+  const body = getEl("rx-text", "rx-body");
+  if (!body) return;
+  if (body.isContentEditable) return; // em modo edição, não sobrescrever
+  const text = rxBaseText || "";
+  if (!builtChunks.length) {
+    body.textContent = text;
+    return;
   }
-}
-
-// Retorna HTML com o texto original e cada chunk envolvido em <mark>.
-// Chunks podem se sobrepor no texto — usamos o intervalo de menor start,
-// e em caso de empate o de maior tamanho.
-function renderMarkedText(text, chunks) {
-  if (!text) return "";
-  const ranges = [];
-  chunks.forEach(chunk => {
-    if (!chunk) return;
-    let from = 0;
-    while (from <= text.length) {
-      const idx = text.indexOf(chunk, from);
-      if (idx === -1) break;
-      ranges.push({ start: idx, end: idx + chunk.length, chunk });
-      from = idx + Math.max(1, chunk.length);
-    }
-  });
-  ranges.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
-
-  let out = "";
-  let cursor = 0;
+  // Ordena e mescla ranges sobrepostos
+  const ranges = [...builtChunks].sort((a, b) => a.start - b.start);
+  const merged = [];
   ranges.forEach(r => {
-    if (r.start < cursor) return; // ignora sobreposições
-    out += escapeHtml(text.slice(cursor, r.start));
-    out += `<mark class="rx-med-mark" data-chunk="${escapeHtml(r.chunk)}" onclick="toggleRxMedText(this.dataset.chunk)">${escapeHtml(text.slice(r.start, r.end))}</mark>`;
+    const last = merged[merged.length - 1];
+    if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+    else merged.push({ ...r });
+  });
+  let html = "";
+  let cursor = 0;
+  merged.forEach((r, idx) => {
+    if (r.start > cursor) html += escapeHtml(text.slice(cursor, r.start));
+    html += `<mark class="rx-picked" data-idx="${idx}">${escapeHtml(text.slice(r.start, r.end))}</mark>`;
     cursor = r.end;
   });
-  out += escapeHtml(text.slice(cursor));
-  // preserva quebras de linha
-  return `<pre class="rx-med-fulltext">${out}</pre>`;
+  if (cursor < text.length) html += escapeHtml(text.slice(cursor));
+  body.innerHTML = html;
 }
 
-// Alterna a inclusão de um trecho (substring arbitrária) na prévia amarela.
-// A prévia mantém o texto original completo; trechos "removidos" são
-// tirados da prévia mas continuam realçados no texto acima.
-function toggleRxMedText(rawChunk) {
-  const preview = document.getElementById("rx-med-preview");
-  if (!preview || !rawChunk) return;
-  const chunk = String(rawChunk);
-  if (!chunk) return;
-
-  let removed = [];
-  try { removed = JSON.parse(preview.dataset.removedChunks || "[]"); } catch {}
-
-  const i = removed.indexOf(chunk);
-  const nowRemoved = i === -1;
-  if (nowRemoved) removed.push(chunk);
-  else removed.splice(i, 1);
-  preview.dataset.removedChunks = JSON.stringify(removed);
-
-  // Reconstrói a prévia a partir do texto original, retirando cada
-  // chunk removido (primeira ocorrência de cada).
-  let value = preview.dataset.originalText || "";
-  removed.forEach(c => {
-    const idx = value.indexOf(c);
-    if (idx !== -1) value = value.slice(0, idx) + value.slice(idx + c.length);
-  });
-  // Colapsa linhas em branco duplicadas geradas pela remoção
-  value = value.replace(/\n{3,}/g, "\n\n");
-  preview.value = value;
-
-  // Feedback visual nos <mark> correspondentes
-  document.querySelectorAll(`#rx-med-lines .rx-med-mark[data-chunk="${CSS.escape(chunk)}"]`).forEach(el => {
-    el.classList.toggle("is-removed", nowRemoved);
-  });
+function renderBuiltRx() {
+  const out = document.getElementById("rx-build-text");
+  const hint = document.getElementById("rx-build-hint");
+  const card = document.getElementById("rx-build-card");
+  if (!out) return;
+  if (!builtChunks.length) {
+    out.textContent = "";
+    if (card) card.classList.remove("has-content");
+    if (hint) hint.style.display = "block";
+    return;
+  }
+  const ranges = [...builtChunks].sort((a, b) => a.start - b.start);
+  const parts = ranges.map(r => rxBaseText.slice(r.start, r.end));
+  out.textContent = parts.join("\n");
+  if (card) card.classList.add("has-content");
+  if (hint) hint.style.display = "none";
 }
 
-// Handler global do atalho Ctrl/Cmd+G na tela de visualização.
-// Usa exatamente a substring selecionada (não expande para linha inteira).
-function handleRxMarkKey(e) {
-  const isCombo = (e.key === "g" || e.key === "G") && (e.metaKey || e.ctrlKey);
-  if (!isCombo) return;
-  const pickerWrap = document.getElementById("rx-med-picker-wrap");
-  if (!pickerWrap || pickerWrap.style.display === "none") return;
+// Converte posição do range DOM em offset dentro de rxBaseText, considerando
+// que o body pode conter <mark> spans com o mesmo texto base concatenado.
+function getBodyTextOffset(node, offset) {
+  const body = getEl("rx-text", "rx-body");
+  if (!body || !body.contains(node)) return -1;
+  let count = 0;
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+  let n;
+  while ((n = walker.nextNode())) {
+    if (n === node) return count + offset;
+    count += n.nodeValue.length;
+  }
+  return -1;
+}
 
+function handleRxSelectionShortcut(e) {
+  // Ctrl+G (Win/Linux) ou Cmd+G (Mac); ignora se estiver editando
+  const isG = (e.key === "g" || e.key === "G");
+  if (!isG) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const body = getEl("rx-text", "rx-body");
+  if (!body || body.isContentEditable) return;
   const sel = window.getSelection();
-  const raw = sel ? sel.toString() : "";
-  if (!raw) return;
-
-  const anchor = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
-  if (!anchor || !anchor.closest("#rx-med-picker-wrap")) return;
-
+  if (!sel || sel.rangeCount === 0) return;
+  const range = sel.getRangeAt(0);
+  if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
+  if (range.collapsed) return;
   e.preventDefault();
-  toggleRxMedText(raw);
-  if (sel.removeAllRanges) sel.removeAllRanges();
+  const start = getBodyTextOffset(range.startContainer, range.startOffset);
+  const end = getBodyTextOffset(range.endContainer, range.endOffset);
+  if (start < 0 || end < 0 || start === end) return;
+  const s = Math.min(start, end);
+  const eOff = Math.max(start, end);
+  toggleBuiltRange(s, eOff);
+  sel.removeAllRanges();
+}
+
+function toggleBuiltRange(s, e) {
+  // Se a nova seleção está totalmente contida em um chunk existente, remove-o.
+  const containingIdx = builtChunks.findIndex(r => r.start <= s && r.end >= e);
+  if (containingIdx >= 0 && (builtChunks[containingIdx].end - builtChunks[containingIdx].start) === (e - s)) {
+    builtChunks.splice(containingIdx, 1);
+  } else if (containingIdx >= 0 && builtChunks[containingIdx].start === s && builtChunks[containingIdx].end === e) {
+    builtChunks.splice(containingIdx, 1);
+  } else {
+    // adiciona; mescla sobreposições
+    builtChunks.push({ start: s, end: e });
+    builtChunks.sort((a, b) => a.start - b.start);
+    const merged = [];
+    builtChunks.forEach(r => {
+      const last = merged[merged.length - 1];
+      if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
+      else merged.push({ ...r });
+    });
+    builtChunks = merged;
+  }
+  renderRxBody();
+  renderBuiltRx();
+}
+
+function handleRxMarkClick(e) {
+  const mark = e.target.closest("mark.rx-picked");
+  if (!mark) return;
+  const body = getEl("rx-text", "rx-body");
+  if (!body || body.isContentEditable) return;
+  e.preventDefault();
+  // Localiza offset baseado no texto acumulado até o mark
+  let count = 0;
+  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
+  let n;
+  let markStart = -1;
+  let markLen = mark.textContent.length;
+  while ((n = walker.nextNode())) {
+    if (mark.contains(n)) { markStart = count; break; }
+    count += n.nodeValue.length;
+  }
+  if (markStart < 0) return;
+  const s = markStart;
+  const eOff = markStart + markLen;
+  toggleBuiltRange(s, eOff);
+}
+
+function clearBuiltRx() {
+  builtChunks = [];
+  renderRxBody();
+  renderBuiltRx();
+}
+
+function copyBuiltRx() {
+  const out = document.getElementById("rx-build-text");
+  if (!out) return;
+  const text = out.textContent || "";
+  if (!text.trim()) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const fb = document.getElementById("build-copy-feedback");
+    if (fb) { fb.classList.add("show"); setTimeout(() => fb.classList.remove("show"), 1800); }
+  });
+}
+
+// Wire up shortcuts globalmente uma vez
+if (typeof window !== "undefined" && !window.__rxBuilderWired) {
+  window.__rxBuilderWired = true;
+  window.addEventListener("keydown", handleRxSelectionShortcut);
+  document.addEventListener("click", (e) => {
+    if (e.target.closest && e.target.closest("#rx-text, #rx-body")) {
+      handleRxMarkClick(e);
+    }
+  });
 }
 
 // Renderiza a galeria de imagens da variante (ex: traçados de ECG)
@@ -509,10 +529,8 @@ function setRxEditMode(mode) {
 function editCurrentPrescription() {
   setRxEditMode(true);
   const v = currentPrescription.variants && currentPrescription.variants[currentVariantIndex];
-  if (v) {
-    const body = getEl("rx-text", "rx-body");
-    if (body) body.innerText = v.text || "";
-  }
+  const body = getEl("rx-text", "rx-body");
+  if (body) body.innerText = rxBaseText || (v && v.text) || "";
 }
 
 async function saveRxInlineEdit() {
@@ -537,16 +555,9 @@ async function saveRxInlineEdit() {
 }
 
 function copyPrescription() {
-  const pickerWrap = document.getElementById("rx-med-picker-wrap");
-  let text;
-  if (pickerWrap && pickerWrap.style.display !== "none") {
-    const preview = document.getElementById("rx-med-preview");
-    text = preview ? preview.value : "";
-  } else {
-    const body = getEl("rx-text", "rx-body");
-    if (!body) return;
-    text = body.innerText;
-  }
+  const body = getEl("rx-text", "rx-body");
+  if (!body) return;
+  const text = body.innerText;
   navigator.clipboard.writeText(text).then(() => {
     const feedback = document.getElementById("copy-feedback");
     feedback.classList.add("show");
@@ -585,9 +596,9 @@ async function renderAdminList(filter = "") {
   container.innerHTML = '<div class="empty-state">Carregando...</div>';
   try {
     const all = mergeBySameDisease(await window.dbGetAll()).sort((a, b) => {
-      const sec = a.sector.localeCompare(b.sector);
+      const sec = (a.sector || "").localeCompare(b.sector || "");
       if (sec !== 0) return sec;
-      return a.disease.localeCompare(b.disease);
+      return (a.disease || "").localeCompare(b.disease || "");
     });
     const sectorFilter = document.getElementById("admin-sector-filter")?.value || "";
     
@@ -624,7 +635,7 @@ function filterAdminList() {
 }
 
 // ── Fluxos de Inclusão e Edição Estrutural no Form ────────
-function addVariantField(containerId = "variants-container", label = "", text = "", images = [], medLines = []) {
+function addVariantField(containerId = "variants-container", label = "", text = "", images = []) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const div = document.createElement("div");
@@ -632,13 +643,9 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   div.innerHTML = `
     <div class="variant-form-header variant-edit-header">
       <input type="text" placeholder="Nome da Variante (ex: Sem Comorbidades, Alergia)" class="var-label variant-label-input" value="${escapeHtml(label)}" required />
-      <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.closest('.variant-form-group').remove()">✕ Remover</button>
+      <button type="button" class="btn-remove-var btn-remove-variant" onclick="this.parentElement.parentElement.remove()">✕ Remover</button>
     </div>
-    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required oninput="refreshVariantLinePicker(this)" onkeydown="handleVariantMarkKey(event)">${escapeHtml(text)}</textarea>
-    <div class="var-line-picker-wrap">
-      <span class="var-col-label">Selecione qualquer trecho (palavra, parte de linha ou várias linhas) e pressione <kbd>Ctrl</kbd>+<kbd>G</kbd> (ou <kbd>⌘</kbd>+<kbd>G</kbd>) para marcar como medicamento. Os trechos marcados aparecem abaixo.</span>
-      <div class="var-line-picker" data-med-lines="[]"></div>
-    </div>
+    <textarea rows="10" placeholder="Escreva livremente a prescrição..." class="var-text variant-text-input" required>${escapeHtml(text)}</textarea>
     <div class="var-images-block">
       <div class="var-images-head">
         <span>Imagens</span>
@@ -652,101 +659,7 @@ function addVariantField(containerId = "variants-container", label = "", text = 
   container.appendChild(div);
   const imgList = div.querySelector(".var-images-list");
   (images || []).forEach(img => addVariantImageEntry(imgList, img));
-
-  const draftArea = div.querySelector(".var-text");
-  if (draftArea) refreshVariantLinePicker(draftArea, medLines);
-
   return div;
-}
-
-// ── Marcação de trechos de medicamento (na criação/edição) ─────────
-// O médico seleciona qualquer trecho do rascunho (uma palavra, um
-// pedaço de linha, várias linhas — não precisa ser linha inteira) e
-// pressiona Ctrl/Cmd+G para marcar como medicamento. Essa marcação é
-// salva junto da variante (medLines = array de substrings) e vira o
-// realce clicável na tela de visualização.
-function refreshVariantLinePicker(textarea, presetLines) {
-  const block = textarea.closest(".variant-form-group");
-  if (!block) return;
-  const picker = block.querySelector(".var-line-picker");
-  if (!picker) return;
-
-  // Fonte de verdade: array em picker.dataset.medLines (JSON).
-  let current;
-  if (presetLines && presetLines.length) {
-    current = presetLines.map(s => String(s)).filter(Boolean);
-  } else {
-    try { current = JSON.parse(picker.dataset.medLines || "[]"); }
-    catch { current = []; }
-  }
-
-  // Descarta marcações que não existem mais no texto (após edição)
-  const value = textarea.value;
-  current = current.filter(chunk => chunk && value.indexOf(chunk) !== -1);
-  picker.dataset.medLines = JSON.stringify(current);
-
-  if (!current.length) {
-    picker.innerHTML = `<span class="var-line-empty">Nenhum medicamento marcado ainda.</span>`;
-    return;
-  }
-
-  picker.innerHTML = current.map(chunk => `
-    <span class="var-line-tag">
-      <span class="var-line-text">${escapeHtml(chunk.replace(/\n/g, " ⏎ "))}</span>
-      <button type="button" class="var-line-tag-remove" title="Remover marcação" onclick="unmarkVariantLine(this, ${JSON.stringify(chunk).replace(/"/g,'&quot;')})">✕</button>
-    </span>
-  `).join("");
-}
-
-// Remove um trecho marcado (botão ✕ na tag)
-function unmarkVariantLine(btn, chunk) {
-  const block = btn.closest(".variant-form-group");
-  if (!block) return;
-  const picker = block.querySelector(".var-line-picker");
-  const textarea = block.querySelector(".var-text");
-  if (!picker || !textarea) return;
-  let arr = [];
-  try { arr = JSON.parse(picker.dataset.medLines || "[]"); } catch {}
-  arr = arr.filter(c => c !== chunk);
-  picker.dataset.medLines = JSON.stringify(arr);
-  refreshVariantLinePicker(textarea);
-}
-
-// Ctrl/Cmd+G dentro do textarea: marca EXATAMENTE a substring selecionada
-// como medicamento (sem expandir para linha inteira). Se o mesmo trecho
-// já estiver marcado, o atalho desmarca.
-function handleVariantMarkKey(e) {
-  const isCombo = (e.key === "g" || e.key === "G") && (e.metaKey || e.ctrlKey);
-  if (!isCombo) return;
-  const textarea = e.currentTarget || e.target;
-  if (!textarea || textarea.tagName !== "TEXTAREA") return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-  if (start === end) return;
-
-  e.preventDefault();
-  const chunk = textarea.value.slice(start, end);
-  if (!chunk) return;
-
-  const block = textarea.closest(".variant-form-group");
-  const picker = block && block.querySelector(".var-line-picker");
-  if (!picker) return;
-
-  let current;
-  try { current = JSON.parse(picker.dataset.medLines || "[]"); } catch { current = []; }
-  const i = current.indexOf(chunk);
-  if (i === -1) current.push(chunk);
-  else current.splice(i, 1);
-  picker.dataset.medLines = JSON.stringify(current);
-  refreshVariantLinePicker(textarea);
-}
-
-
-// Compat: mantém a função exportada, mas não é mais usada pela UI
-function toggleVariantLineCheck(checkbox) {
-  const row = checkbox.closest(".var-line-row");
-  if (row) row.classList.toggle("checked", checkbox.checked);
 }
 
 // ── Compressão de imagens (mantém tudo no Firestore, sem Storage) ─
@@ -865,22 +778,11 @@ function collectVariantImages(block) {
 }
 
 function collectAllVariantsImages(blocks) {
-  return [...blocks].map(b => {
-    const draftEl = b.querySelector(".var-text");
-    const text = draftEl ? draftEl.value : "";
-    let medLines = [];
-    try {
-      const picker = b.querySelector(".var-line-picker");
-      if (picker && picker.dataset.medLines) medLines = JSON.parse(picker.dataset.medLines);
-    } catch { medLines = []; }
-    medLines = (medLines || []).map(l => String(l).trim()).filter(Boolean);
-    return {
-      label: b.querySelector(".var-label").value,
-      text,
-      medLines,
-      images: collectVariantImages(b)
-    };
-  });
+  return [...blocks].map(b => ({
+    label: b.querySelector(".var-label").value,
+    text: b.querySelector(".var-text").value,
+    images: collectVariantImages(b)
+  }));
 }
 
 // ── Buscar doença existente ao criar (evita duplicar por variação) ─
@@ -947,7 +849,7 @@ async function selectExistingDisease(id) {
 
     const container = document.getElementById("new-variants-container");
     container.innerHTML = "";
-    (p.variants || []).forEach(v => addVariantField("new-variants-container", v.label, v.text, v.images, v.medLines));
+    (p.variants || []).forEach(v => addVariantField("new-variants-container", v.label, v.text, v.images));
     addNewVariantField(); // bloco extra em branco para a nova variante
   } catch(e) {
     alert("Erro ao carregar doença.");
@@ -1041,7 +943,7 @@ async function startEdit(id) {
     container.innerHTML = "";
     
     if (p.variants && p.variants.length) {
-      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text, v.images, v.medLines));
+      p.variants.forEach(v => addVariantField("variants-container", v.label, v.text, v.images));
     } else {
       addVariantField("variants-container", "Padrão", p.text || "");
     }
@@ -1552,17 +1454,12 @@ function calculateSedacao() {
     note.textContent = presentation.helper;
   });
 }
-// Compat: mantida para não quebrar chamadas legadas em HTML.
-function toggleRxMedLine(checkbox) {
-  if (checkbox && checkbox.dataset && checkbox.dataset.line) toggleRxMedText(checkbox.dataset.line);
-}
 // ── Exportação Amarrada para o Escopo Global ──────────────
 Object.assign(window, {
   selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
   switchVariant, openAdmin, closeAdmin, closeAdminIfOutside, switchTab,
   renderAdminList, filterAdminList, startEdit, saveNewPrescription, updatePrescription, deletePrescription,
   addVariantField, addNewVariantField, addVariantFieldEdit,
-  refreshVariantLinePicker, toggleVariantLineCheck, toggleRxMedLine, renderRxMedPicker, toggleRxMedText, handleRxMarkKey, handleVariantMarkKey, unmarkVariantLine,
   mergeBySameDisease, prepareAddTab, searchExistingDisease, selectExistingDisease, cancelAddToExisting,
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
