@@ -373,21 +373,17 @@ function handleRxMarkClick(e) {
   const card = document.getElementById("rx-build-card");
   if (!out) return;
 
-  const textToAdd = mark.textContent.trim();
-  let currentLines = out.textContent ? out.textContent.split("\n").filter(Boolean) : [];
+  mark.classList.toggle("active-selected");
 
-  // Se já está na receita montada, ao clicar ele remove; se não está, adiciona
-  if (currentLines.includes(textToAdd)) {
-    currentLines = currentLines.filter(line => line !== textToAdd);
-    mark.classList.remove("active-selected");
-  } else {
-    currentLines.push(textToAdd);
-    mark.classList.add("active-selected");
-  }
+  // Remonta a receita a partir dos <mark> selecionados, na ordem em que
+  // aparecem no texto original — não na ordem dos cliques — e mantendo
+  // cada bloco (mesmo com quebras de linha internas) intacto, sem inserir
+  // espaço extra dentro dele. O espaço em branco só entra ENTRE seleções.
+  const selectedMarks = Array.from(body.querySelectorAll("mark.rx-picked.active-selected"));
+  const parts = selectedMarks.map(m => m.textContent.trim()).filter(Boolean);
+  out.textContent = parts.join("\n\n");
 
-  out.textContent = currentLines.join("\n\n");
-
-  if (currentLines.length > 0) {
+  if (parts.length > 0) {
     if (card) card.classList.add("has-content");
     if (hint) hint.style.display = "none";
   } else {
