@@ -339,7 +339,7 @@ function copyBuiltRx() {
 // único clique já deixe a receita montada pronta pra edição.
 function focusBuildTextAtEnd(el) {
   if (!el) return;
-  el.focus();
+  el.focus({ preventScroll: true });
   const range = document.createRange();
   range.selectNodeContents(el);
   range.collapse(false);
@@ -385,7 +385,7 @@ function handleRxMarkClick(e) {
     mark.classList.add("active-selected");
   }
 
-  out.textContent = currentLines.join("\n");
+  out.textContent = currentLines.join("\n\n");
 
   if (currentLines.length > 0) {
     if (card) card.classList.add("has-content");

@@ -2184,33 +2184,47 @@ body.sector-red .rx-image-figure {
 }
 
 /* ── Realce da seleção incorporada à receita ───────────── */
-/* Estado "marcado" (Cmd/Ctrl+G): apenas indica que é clicável, sem parecer
-   que já foi adicionado à receita montada. */
-#rx-text mark.rx-picked,
-#rx-body mark.rx-picked {
+
+/* Modo edição: a marcação já aparece em verde, sem precisar de hover —
+   é aqui que você confere/ajusta o que está marcado. */
+#rx-text.editing mark.rx-picked,
+#rx-body.editing mark.rx-picked {
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+/* Modo visualização (hora de prescrever): fica neutra, só revela o verde
+   quando o mouse passa por cima — convite discreto ao clique. */
+#rx-text:not(.editing) mark.rx-picked,
+#rx-body:not(.editing) mark.rx-picked {
   background: transparent;
   color: inherit;
-  border: 1.5px solid var(--accent);
+  border: 1.5px solid transparent;
   border-radius: 4px;
   padding: 0 2px;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
-#rx-text mark.rx-picked:hover,
-#rx-body mark.rx-picked:hover {
+#rx-text:not(.editing) mark.rx-picked:hover,
+#rx-body:not(.editing) mark.rx-picked:hover {
   background: var(--accent-dim);
+  border-color: var(--accent);
 }
 
-/* Estado "adicionado" (clicado na hora de prescrever): agora sim preenchido,
-   confirmando que está na receita montada. */
-#rx-text mark.rx-picked.active-selected,
-#rx-body mark.rx-picked.active-selected {
+/* Estado "adicionado" (já clicado, está na receita montada): permanece
+   preenchido mesmo sem o mouse em cima, pra você ver o que já escolheu. */
+#rx-text:not(.editing) mark.rx-picked.active-selected,
+#rx-body:not(.editing) mark.rx-picked.active-selected {
   background: var(--accent-dim);
   color: var(--accent);
   border-color: var(--accent);
 }
-#rx-text mark.rx-picked.active-selected:hover,
-#rx-body mark.rx-picked.active-selected:hover {
+#rx-text:not(.editing) mark.rx-picked.active-selected:hover,
+#rx-body:not(.editing) mark.rx-picked.active-selected:hover {
   background: var(--accent-glow);
 }
 
