@@ -194,85 +194,95 @@ function renderVariantContent(idx) {
   }
 
   rxBaseText = text;
-  builtChunks = [];
+  // Restaura as marcações (verde) salvas junto com essa variante
+  pickedRanges = Array.isArray(v.pickedRanges)
+    ? v.pickedRanges.map(r => ({ start: r.start, end: r.end }))
+    : [];
   renderRxBody();
-  renderBuiltRx();
+  clearBuiltRx(); // a receita montada é um rascunho por visita; começa vazia
   renderRxImageGallery(v.images);
 }
 
-// ── Montagem incremental da receita via seleção (Ctrl/Cmd+G) ─────
+// ── Marcação persistente (Ctrl/Cmd+G) + montagem por clique ──────
 let rxBaseText = "";
-let builtChunks = []; // array de { start, end } sobre rxBaseText
+let pickedRanges = []; // array de { start, end } sobre rxBaseText, salvo com a variante
 
-function renderRxBody() {
-  const body = getEl("rx-text", "rx-body");
-  if (!body) return;
-  if (body.isContentEditable) return; // em modo edição, não sobrescrever
-  const text = rxBaseText || "";
-  if (!builtChunks.length) {
-    body.textContent = text;
-    return;
-  }
-  // Ordena e mescla ranges sobrepostos
-  const ranges = [...builtChunks].sort((a, b) => a.start - b.start);
+// Monta o HTML com os trechos marcados (<mark class="rx-picked">) a partir
+// de um texto puro e uma lista de ranges. Usado tanto na visualização quanto
+// na edição, para que a marcação nunca se perca.
+function buildMarkedHtml(text, ranges) {
+  if (!ranges || !ranges.length) return escapeHtml(text);
+  const sorted = [...ranges].sort((a, b) => a.start - b.start);
   const merged = [];
-  ranges.forEach(r => {
+  sorted.forEach(r => {
     const last = merged[merged.length - 1];
     if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
     else merged.push({ ...r });
   });
   let html = "";
   let cursor = 0;
-  merged.forEach((r, idx) => {
+  merged.forEach(r => {
     if (r.start > cursor) html += escapeHtml(text.slice(cursor, r.start));
-    html += `<mark class="rx-picked" data-idx="${idx}">${escapeHtml(text.slice(r.start, r.end))}</mark>`;
+    html += `<mark class="rx-picked">${escapeHtml(text.slice(r.start, r.end))}</mark>`;
     cursor = r.end;
   });
   if (cursor < text.length) html += escapeHtml(text.slice(cursor));
-  body.innerHTML = html;
+  return html;
 }
 
-function renderBuiltRx() {
-  const out = document.getElementById("rx-build-text");
-  const hint = document.getElementById("rx-build-hint");
-  const card = document.getElementById("rx-build-card");
-  if (!out) return;
-  if (!builtChunks.length) {
-    out.textContent = "";
-    if (card) card.classList.remove("has-content");
-    if (hint) hint.style.display = "block";
-    return;
-  }
-  const ranges = [...builtChunks].sort((a, b) => a.start - b.start);
-  const parts = ranges.map(r => rxBaseText.slice(r.start, r.end));
-  out.textContent = parts.join("\n");
-  if (card) card.classList.add("has-content");
-  if (hint) hint.style.display = "none";
-}
-
-// Converte posição do range DOM em offset dentro de rxBaseText, considerando
-// que o body pode conter <mark> spans com o mesmo texto base concatenado.
-function getBodyTextOffset(node, offset) {
+function renderRxBody() {
   const body = getEl("rx-text", "rx-body");
-  if (!body || !body.contains(node)) return -1;
-  let count = 0;
-  const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT, null);
-  let n;
-  while ((n = walker.nextNode())) {
-    if (n === node) return count + offset;
-    count += n.nodeValue.length;
+  if (!body) return;
+  if (body.isContentEditable) return; // em modo edição, não sobrescrever
+  body.innerHTML = buildMarkedHtml(rxBaseText || "", pickedRanges);
+}
+
+// Percorre o conteúdo editado e devolve, em uma única passada, o texto puro
+// e os ranges marcados — garante que texto e marcações nunca fiquem
+// dessincronizados entre si.
+function extractTextAndPickedRanges(root) {
+  let text = "";
+  const ranges = [];
+
+  function walk(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      text += node.nodeValue;
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const tag = node.tagName;
+    if (tag === "BR") {
+      text += "\n";
+      return;
+    }
+
+    const isBlock = (tag === "DIV" || tag === "P");
+    if (isBlock && text.length > 0 && !text.endsWith("\n")) {
+      text += "\n";
+    }
+
+    const isMark = tag === "MARK" && node.classList.contains("rx-picked");
+    const start = text.length;
+
+    node.childNodes.forEach(walk);
+
+    if (isMark) ranges.push({ start, end: text.length });
   }
-  return -1;
+
+  root.childNodes.forEach(walk);
+  return { text, ranges };
 }
 
 function handleRxSelectionShortcut(e) {
-  // Ctrl+G (Win/Linux) ou Cmd+G (Mac)
+  // Ctrl+G (Win/Linux) ou Cmd+G (Mac) — só funciona durante a edição da receita
   const isG = (e.key === "g" || e.key === "G");
   if (!isG) return;
   if (!(e.ctrlKey || e.metaKey)) return;
 
   const body = getEl("rx-text", "rx-body");
   if (!body) return;
+  if (!body.isContentEditable) return; // fora da edição, Cmd+G não faz nada
 
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
@@ -281,14 +291,18 @@ function handleRxSelectionShortcut(e) {
   if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
   if (range.collapsed) return;
 
-  e.preventDefault();
-
-  // Aplica a marcação verde (<mark class="rx-picked">) via comando do editor de texto
-  // Isso funciona tanto em modo normal quanto em modo de edição (contentEditable)
   const selectedText = sel.toString();
   if (!selectedText) return;
 
-  // Executa o envelopamento com a classe css 'rx-picked'
+  // Evita marcar de novo um trecho que já está dentro de uma marcação
+  const anchorEl = range.commonAncestorContainer.nodeType === 1
+    ? range.commonAncestorContainer
+    : range.commonAncestorContainer.parentElement;
+  if (anchorEl && anchorEl.closest("mark.rx-picked")) return;
+
+  e.preventDefault();
+
+  // Aplica a marcação (borda verde, clicável) via <mark class="rx-picked">
   const mark = document.createElement("mark");
   mark.className = "rx-picked";
   mark.textContent = selectedText;
@@ -296,69 +310,18 @@ function handleRxSelectionShortcut(e) {
   range.deleteContents();
   range.insertNode(mark);
   sel.removeAllRanges();
-
-  // Se o usuário marcou algo, já disponibiliza para a lógica da receita montada
-  syncEditableBaseText();
-}
-
-function syncEditableBaseText() {
-  const body = getEl("rx-text", "rx-body");
-  if (body) {
-    rxBaseText = body.innerText;
-  }
-}
-
-function toggleBuiltRange(s, e) {
-  // Se a nova seleção está totalmente contida em um chunk existente, remove-o.
-  const containingIdx = builtChunks.findIndex(r => r.start <= s && r.end >= e);
-  if (containingIdx >= 0 && (builtChunks[containingIdx].end - builtChunks[containingIdx].start) === (e - s)) {
-    builtChunks.splice(containingIdx, 1);
-  } else if (containingIdx >= 0 && builtChunks[containingIdx].start === s && builtChunks[containingIdx].end === e) {
-    builtChunks.splice(containingIdx, 1);
-  } else {
-    // adiciona; mescla sobreposições
-    builtChunks.push({ start: s, end: e });
-    builtChunks.sort((a, b) => a.start - b.start);
-    const merged = [];
-    builtChunks.forEach(r => {
-      const last = merged[merged.length - 1];
-      if (last && r.start <= last.end) last.end = Math.max(last.end, r.end);
-      else merged.push({ ...r });
-    });
-    builtChunks = merged;
-  }
-  renderRxBody();
-  renderBuiltRx();
-}
-
-function renderBuiltRx() {
-  const out = document.getElementById("rx-build-text");
-  const hint = document.getElementById("rx-build-hint");
-  const card = document.getElementById("rx-build-card");
-  if (!out) return;
-
-  if (!builtChunks.length && !out.textContent.trim()) {
-    out.textContent = "";
-    if (card) card.classList.remove("has-content");
-    if (hint) hint.style.display = "block";
-    return;
-  }
-
-  // Só atualiza se o usuário não tiver inserido textos manuais durante edição
-  if (builtChunks.length > 0) {
-    const ranges = [...builtChunks].sort((a, b) => a.start - b.start);
-    const parts = ranges.map(r => rxBaseText.slice(r.start, r.end));
-    out.textContent = parts.join("\n");
-  }
-
-  if (card) card.classList.add("has-content");
-  if (hint) hint.style.display = "none";
 }
 
 function clearBuiltRx() {
-  builtChunks = [];
-  renderRxBody();
-  renderBuiltRx();
+  const out = document.getElementById("rx-build-text");
+  const hint = document.getElementById("rx-build-hint");
+  const card = document.getElementById("rx-build-card");
+  if (out) out.textContent = "";
+  if (card) card.classList.remove("has-content");
+  if (hint) hint.style.display = "block";
+  document
+    .querySelectorAll("#rx-text mark.rx-picked.active-selected, #rx-body mark.rx-picked.active-selected")
+    .forEach(m => m.classList.remove("active-selected"));
 }
 
 function copyBuiltRx() {
@@ -370,6 +333,19 @@ function copyBuiltRx() {
     const fb = document.getElementById("build-copy-feedback");
     if (fb) { fb.classList.add("show"); setTimeout(() => fb.classList.remove("show"), 1800); }
   });
+}
+
+// Coloca o cursor no fim de um contentEditable e foca — usado para que um
+// único clique já deixe a receita montada pronta pra edição.
+function focusBuildTextAtEnd(el) {
+  if (!el) return;
+  el.focus();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
 }
 
 // Wire up shortcuts globalmente uma vez
@@ -418,6 +394,9 @@ function handleRxMarkClick(e) {
     if (card) card.classList.remove("has-content");
     if (hint) hint.style.display = "block";
   }
+
+  // Um único clique já leva o cursor pro fim da receita montada, pronta pra editar
+  focusBuildTextAtEnd(out);
 }
 
 // Renderiza a galeria de imagens da variante (ex: traçados de ECG)
@@ -590,16 +569,20 @@ function editCurrentPrescription() {
   setRxEditMode(true);
   const v = currentPrescription.variants && currentPrescription.variants[currentVariantIndex];
   const body = getEl("rx-text", "rx-body");
-  if (body) body.innerText = rxBaseText || (v && v.text) || "";
+  const text = rxBaseText || (v && v.text) || "";
+  // Mostra as marcações já salvas para que possam continuar sendo usadas/ajustadas
+  if (body) body.innerHTML = buildMarkedHtml(text, pickedRanges);
 }
 
 async function saveRxInlineEdit() {
   if (!currentPrescription) return;
   const body = getEl("rx-text", "rx-body");
   if (!body) return;
-  const newText = body.innerText;
-  
+
+  const { text: newText, ranges: newRanges } = extractTextAndPickedRanges(body);
+
   currentPrescription.variants[currentVariantIndex].text = newText;
+  currentPrescription.variants[currentVariantIndex].pickedRanges = newRanges;
   showLoading();
   try {
     await window.dbUpdate(currentPrescription.id, {
