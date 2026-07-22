@@ -289,16 +289,28 @@ function handleRxSelectionShortcut(e) {
   const range = sel.getRangeAt(0);
 
   if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
+
+  // Se o cursor/seleção está dentro de uma marcação já existente, o
+  // Cmd+G agora funciona como alternância: desfaz essa marcação (volta o
+  // trecho a texto normal), em vez de não fazer nada.
+  const anchorEl = range.commonAncestorContainer.nodeType === 1
+    ? range.commonAncestorContainer
+    : range.commonAncestorContainer.parentElement;
+  const existingMark = anchorEl && anchorEl.closest("mark.rx-picked");
+  if (existingMark) {
+    e.preventDefault();
+    const parent = existingMark.parentNode;
+    while (existingMark.firstChild) parent.insertBefore(existingMark.firstChild, existingMark);
+    parent.removeChild(existingMark);
+    parent.normalize();
+    sel.removeAllRanges();
+    return;
+  }
+
   if (range.collapsed) return;
 
   const selectedText = sel.toString();
   if (!selectedText) return;
-
-  // Evita marcar de novo um trecho que já está dentro de uma marcação
-  const anchorEl = range.commonAncestorContainer.nodeType === 1
-    ? range.commonAncestorContainer
-    : range.commonAncestorContainer.parentElement;
-  if (anchorEl && anchorEl.closest("mark.rx-picked")) return;
 
   e.preventDefault();
 
@@ -365,6 +377,11 @@ function handleRxMarkClick(e) {
 
   const body = getEl("rx-text", "rx-body");
   if (!body) return;
+
+  // Em modo de edição, um clique dentro da marcação deve apenas posicionar
+  // o cursor para digitar — não deve alternar a marcação para a "receita
+  // montada" (isso só faz sentido no modo de visualização/prescrição).
+  if (body.isContentEditable) return;
 
   e.preventDefault();
 
