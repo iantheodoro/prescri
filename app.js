@@ -290,19 +290,24 @@ function handleRxSelectionShortcut(e) {
 
   if (!body.contains(range.startContainer) || !body.contains(range.endContainer)) return;
 
-  // Se o cursor/seleção está dentro de uma marcação já existente, o
-  // Cmd+G agora funciona como alternância: desfaz essa marcação (volta o
-  // trecho a texto normal), em vez de não fazer nada.
-  const anchorEl = range.commonAncestorContainer.nodeType === 1
-    ? range.commonAncestorContainer
-    : range.commonAncestorContainer.parentElement;
-  const existingMark = anchorEl && anchorEl.closest("mark.rx-picked");
-  if (existingMark) {
+  // Marcações que a seleção (ou o cursor) toca — Cmd+G desfaz todas elas.
+  // Usamos intersectsNode em vez de checar só o commonAncestorContainer
+  // porque, ao selecionar uma marcação inteira arrastando do início ao
+  // fim dela, o navegador às vezes reporta os limites da seleção no
+  // elemento pai, e não dentro do próprio <mark> — o que fazia o Cmd+G
+  // não reconhecer que a seleção estava "dentro" da marcação.
+  const allMarks = Array.from(body.querySelectorAll("mark.rx-picked"));
+  const touchedMarks = allMarks.filter(m => range.intersectsNode(m));
+
+  if (touchedMarks.length > 0) {
     e.preventDefault();
-    const parent = existingMark.parentNode;
-    while (existingMark.firstChild) parent.insertBefore(existingMark.firstChild, existingMark);
-    parent.removeChild(existingMark);
-    parent.normalize();
+    touchedMarks.forEach(m => {
+      const parent = m.parentNode;
+      if (!parent) return;
+      while (m.firstChild) parent.insertBefore(m.firstChild, m);
+      parent.removeChild(m);
+      parent.normalize();
+    });
     sel.removeAllRanges();
     return;
   }
