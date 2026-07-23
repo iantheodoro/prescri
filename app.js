@@ -1515,6 +1515,108 @@ function calculateSedacao() {
     note.textContent = presentation.helper;
   });
 }
+// ── REMUNE — links de bulas/protocolos em PDF ─────────────
+let remuneLinks = [];
+const REMUNE_SETTINGS_ID = "remune_links";
+
+async function openRemune() {
+  showScreen("screen-remune");
+  showLoading();
+  try {
+    const saved = await window.dbGetSettings(REMUNE_SETTINGS_ID);
+    remuneLinks = (saved && Array.isArray(saved.links)) ? saved.links : [];
+  } catch (e) {
+    console.error("Erro ao carregar links do REMUNE:", e);
+    remuneLinks = [];
+  } finally {
+    hideLoading();
+  }
+  renderRemuneList();
+}
+
+function renderRemuneList() {
+  const list = document.getElementById("remune-list");
+  if (!list) return;
+
+  if (!remuneLinks.length) {
+    list.innerHTML = `<div class="empty-state">Nenhum link cadastrado ainda.<br/>Adicione acima o link de uma bula ou protocolo em PDF.</div>`;
+    return;
+  }
+
+  const sorted = [...remuneLinks].sort((a, b) =>
+    String(a.title || "").localeCompare(String(b.title || ""), "pt-BR")
+  );
+
+  list.innerHTML = sorted.map(item => `
+    <div class="remune-card">
+      <a class="remune-card-main" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">
+        <span class="remune-icon">📄</span>
+        <span class="remune-info">
+          <span class="remune-title">${escapeHtml(item.title)}</span>
+          <span class="remune-url">${escapeHtml(item.url)}</span>
+        </span>
+      </a>
+      <button class="remune-delete" onclick="deleteRemuneLink('${item.id}')" title="Remover">✕</button>
+    </div>
+  `).join("");
+}
+
+function normalizeRemuneUrl(raw) {
+  let url = String(raw || "").trim();
+  if (!url) return "";
+  if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+  return url;
+}
+
+async function addRemuneLinkFromInputs() {
+  const titleInput = document.getElementById("remune-title-input");
+  const urlInput = document.getElementById("remune-url-input");
+  if (!titleInput || !urlInput) return;
+
+  const title = titleInput.value.trim();
+  const url = normalizeRemuneUrl(urlInput.value);
+
+  if (!title || !url) {
+    alert("Preencha o nome do medicamento/documento e o link do PDF.");
+    return;
+  }
+  try {
+    new URL(url);
+  } catch (e) {
+    alert("Link inválido. Verifique o endereço informado.");
+    return;
+  }
+
+  const entry = {
+    id: "rmn_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    title,
+    url,
+    addedAt: Date.now()
+  };
+
+  remuneLinks.push(entry);
+  titleInput.value = "";
+  urlInput.value = "";
+  titleInput.focus();
+  renderRemuneList();
+
+  try {
+    await window.dbSaveSettings(REMUNE_SETTINGS_ID, { links: remuneLinks });
+  } catch (e) {
+    console.error("Erro ao salvar link do REMUNE:", e);
+  }
+}
+
+async function deleteRemuneLink(id) {
+  remuneLinks = remuneLinks.filter(l => l.id !== id);
+  renderRemuneList();
+  try {
+    await window.dbSaveSettings(REMUNE_SETTINGS_ID, { links: remuneLinks });
+  } catch (e) {
+    console.error("Erro ao remover link do REMUNE:", e);
+  }
+}
+
 // ── Exportação Amarrada para o Escopo Global ──────────────
 Object.assign(window, {
   selectSector, goBack, openPrescription, copyPrescription, editCurrentPrescription, setRxEditMode, saveRxInlineEdit, filterDiseases,
@@ -1525,5 +1627,6 @@ Object.assign(window, {
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
   openPediatria, switchPedTab, calculateDose, copyPedResult, filterPedDiseases, updatePediatricPrescriptionContext,
-  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview
+  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
+  openRemune, addRemuneLinkFromInputs, deleteRemuneLink
 });

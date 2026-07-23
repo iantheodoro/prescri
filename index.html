@@ -103,6 +103,15 @@
           <div class="sector-desc">Notas rápidas · somem em 48h</div>
         </button>
       </div>
+
+      <div class="sector-group-label" style="margin-top:28px">Referência</div>
+      <div class="sector-grid sector-grid-special" style="max-width:720px;margin-bottom:8px">
+        <button class="sector-card sector-card-remune" onclick="openRemune()">
+          <div class="sector-icon">📚</div>
+          <div class="sector-name">REMUNE</div>
+          <div class="sector-desc">Links de bulas e protocolos em PDF</div>
+        </button>
+      </div>
       
     </div>
   </div>
@@ -345,6 +354,25 @@
         <button class="btn-add-nota" onclick="addNotaFromInput()">+ Adicionar</button>
       </div>
       <div class="notas-list" id="notas-list"></div>
+    </div>
+  </div>
+
+  <!-- REMUNE SCREEN -->
+  <div id="screen-remune" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" style="background:rgba(167,139,250,0.15);border-color:#a78bfa;color:#a78bfa">📚 REMUNE</div>
+    </div>
+    <div class="remune-content">
+      <h2 class="section-title">REMUNE <em>· referência de medicamentos</em></h2>
+      <p class="remune-hint">Guarde aqui links de bulas, protocolos e outros PDFs de medicamentos que você costuma consultar. Ficam salvos na nuvem e disponíveis em qualquer dispositivo.</p>
+      <form class="remune-input-row" onsubmit="event.preventDefault(); addRemuneLinkFromInputs();">
+        <input type="text" id="remune-title-input" placeholder="Nome do medicamento / documento" required />
+        <input type="url" id="remune-url-input" placeholder="Link do PDF (https://...)" required />
+        <button type="submit" class="btn-add-remune">+ Adicionar</button>
+      </form>
+      <div class="remune-list" id="remune-list"></div>
     </div>
   </div>
 
