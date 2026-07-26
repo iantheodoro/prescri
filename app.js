@@ -85,13 +85,15 @@ async function renderDiseaseList(filter = "") {
   list.innerHTML = `<div class="empty-state">Carregando...</div>`;
   showLoading();
   try {
-    const raw = (await window.dbGetBySector(currentSector))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
-    const items = mergeBySameDisease(raw)
+    const raw = await window.dbGetBySector(currentSector);
+    const merged = mergeBySameDisease(raw)
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
+    const items = merged.filter(p => prescriptionMatchesQuery(p, filter));
 
     if (!items.length) {
-      list.innerHTML = `<div class="empty-state">Nenhum diagnóstico neste setor.<br/>Use o botão ⚙ administrativo para cadastrar.</div>`;
+      list.innerHTML = filter
+        ? `<div class="empty-state">Nenhum resultado para "${escapeHtml(filter)}".</div>`
+        : `<div class="empty-state">Nenhum diagnóstico neste setor.<br/>Use o botão ⚙ administrativo para cadastrar.</div>`;
       return;
     }
 
@@ -110,7 +112,19 @@ async function renderDiseaseList(filter = "") {
 }
 
 function filterDiseases() {
-  renderDiseaseList(document.getElementById("disease-search").value);
+  renderDiseaseList(document.getElementById("search-input").value);
+}
+
+// Verifica se uma prescrição bate com o termo buscado — tanto pelo nome
+// da doença quanto pelo texto (medicamento) contido em qualquer variante.
+function prescriptionMatchesQuery(p, query) {
+  const q = (query || "").trim().toLowerCase();
+  if (!q) return true;
+  if ((p.disease || "").toLowerCase().includes(q)) return true;
+  return (p.variants || []).some(v =>
+    (v.label || "").toLowerCase().includes(q) ||
+    (v.text || "").toLowerCase().includes(q)
+  );
 }
 
 // ── Visualização de Prescrições e Abas ────────────────────
@@ -663,8 +677,8 @@ async function renderAdminList(filter = "") {
     });
     const sectorFilter = document.getElementById("admin-sector-filter")?.value || "";
     
-    const filtered = all.filter(x => 
-      (x.disease || "").toLowerCase().includes(filter.toLowerCase()) || 
+    const filtered = all.filter(x =>
+      prescriptionMatchesQuery(x, filter) ||
       (x.sector || "").toLowerCase().includes(filter.toLowerCase())
     );
     const scoped = sectorFilter
@@ -1181,12 +1195,14 @@ async function renderPedDiseaseList(filter = "") {
   list.innerHTML = `<div class="empty-state">Carregando...</div>`;
   showLoading();
   try {
-    const rawPed = (await window.dbGetBySector("Pediatria"))
-      .filter(p => p.disease.toLowerCase().includes(filter.toLowerCase()));
-    const items = mergeBySameDisease(rawPed)
+    const rawPed = await window.dbGetBySector("Pediatria");
+    const mergedPed = mergeBySameDisease(rawPed)
       .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
+    const items = mergedPed.filter(p => prescriptionMatchesQuery(p, filter));
     if (!items.length) {
-      list.innerHTML = `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
+      list.innerHTML = filter
+        ? `<div class="empty-state">Nenhum resultado para "${escapeHtml(filter)}".</div>`
+        : `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
       return;
     }
     list.innerHTML = items.map(p => `
