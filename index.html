@@ -93,6 +93,11 @@
           <div class="sector-name">Sedação contínua</div>
           <div class="sector-desc">Infusão bidirecional por peso</div>
         </button>
+        <button class="sector-card sector-card-special" onclick="openPacientes()">
+          <div class="sector-icon">🛏️</div>
+          <div class="sector-name">Gestão de Pacientes</div>
+          <div class="sector-desc">Cronômetro por paciente em atendimento</div>
+        </button>
       </div>
 
       <div class="sector-group-label" style="margin-top:28px">Anotações</div>
@@ -357,6 +362,80 @@
     </div>
   </div>
 
+  <!-- GESTÃO DE PACIENTES SCREEN -->
+  <div id="screen-pacientes" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" style="background:rgba(74,240,196,0.12);border-color:var(--accent);color:var(--accent)">🛏️ Pacientes</div>
+    </div>
+    <div class="pac-content">
+      <h2 class="section-title">Gestão de <em>Pacientes</em></h2>
+      <p class="pac-hint">Acompanhe pacientes em atendimento com cronômetro de tempo decorrido. Clique em qualquer célula da tabela para editar. Os dados ficam salvos neste dispositivo.</p>
+
+      <div class="pac-form">
+        <div class="input-group">
+          <label for="pac-name">Nome do Paciente</label>
+          <input type="text" id="pac-name" placeholder="Ex: João Silva" onkeydown="if(event.key==='Enter')addPatient()" />
+        </div>
+        <div class="input-group">
+          <label for="pac-location">Onde está</label>
+          <input type="text" id="pac-location" placeholder="Ex: Leito 04 / Sala de Espera" onkeydown="if(event.key==='Enter')addPatient()" />
+        </div>
+        <div class="input-group">
+          <label for="pac-meds">Medicações</label>
+          <input type="text" id="pac-meds" placeholder="Ex: Dipirona EV, Soro" onkeydown="if(event.key==='Enter')addPatient()" />
+        </div>
+        <div class="input-group">
+          <label for="pac-pending">Pendências</label>
+          <input type="text" id="pac-pending" placeholder="Ex: Aguardando Raio-X" onkeydown="if(event.key==='Enter')addPatient()" />
+        </div>
+        <button class="btn-pac-add" onclick="addPatient()">+ Adicionar Paciente</button>
+      </div>
+
+      <div class="pac-table-wrap">
+        <table class="pac-table">
+          <thead>
+            <tr>
+              <th>Paciente</th>
+              <th>Onde está</th>
+              <th>Medicações</th>
+              <th>Pendências</th>
+              <th>Tempo decorrido</th>
+              <th>Cronômetro</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pac-table-body"></tbody>
+        </table>
+        <div class="empty-state" id="pac-empty" style="display:none">Nenhum paciente em atendimento no momento.</div>
+      </div>
+
+      <div class="pac-history">
+        <div class="pac-history-head">
+          <h3>🗑️ Histórico de Finalizados</h3>
+          <button class="btn-clear-history" onclick="clearPatientHistory()">Limpar Histórico</button>
+        </div>
+        <div class="pac-table-wrap">
+          <table class="pac-table pac-history-table">
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Onde estava</th>
+                <th>Medicações</th>
+                <th>Pendências</th>
+                <th>Tempo total</th>
+                <th>Saída</th>
+              </tr>
+            </thead>
+            <tbody id="pac-history-body"></tbody>
+          </table>
+          <div class="empty-state" id="pac-history-empty" style="display:none">Nenhum registro no histórico.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- REMUNE SCREEN -->
   <div id="screen-remune" class="screen">
     <div class="bg-grid"></div>
@@ -584,6 +663,7 @@
   <script src="pediatria.js?v=20260721-1"></script>
   <script src="db.js?v=20260721-1"></script>
   <script src="notas.js?v=20260721-1"></script>
+  <script src="pacientes.js?v=20260806-1"></script>
   <script src="app.js?v=20260721-1"></script>
 </body>
 </html>
