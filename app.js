@@ -42,7 +42,11 @@ function showScreen(id) {
   document.getElementById(id).classList.add("active");
   // Tema visual da Sala Vermelha só deve valer enquanto estivermos dentro
   // dela; ao voltar para o início, o tema é resetado.
-  if (id === "screen-welcome") document.body.classList.remove("sector-red");
+  if (id === "screen-welcome") {
+    document.body.classList.remove("sector-red");
+    // Invalida o cache da busca global para refletir edições recentes
+    globalSearchCache = null;
+  }
 }
 function goBack(id) { showScreen(id); }
 
@@ -126,6 +130,126 @@ function prescriptionMatchesQuery(p, query) {
     (v.text || "").toLowerCase().includes(q)
   );
 }
+
+// ── Busca Global (tela inicial) ────────────────────────────
+// Pesquisa por doença/medicamento em TODOS os setores de uma vez,
+// além dos medicamentos cadastrados na calculadora pediátrica.
+let globalSearchCache = null;
+let globalSearchDebounce = null;
+
+async function loadGlobalSearchCache() {
+  if (globalSearchCache) return globalSearchCache;
+  try {
+    const raw = await window.dbGetAll();
+    globalSearchCache = mergeBySameDisease(raw);
+  } catch (e) {
+    globalSearchCache = [];
+  }
+  return globalSearchCache;
+}
+
+function handleGlobalSearch() {
+  clearTimeout(globalSearchDebounce);
+  globalSearchDebounce = setTimeout(runGlobalSearch, 150);
+}
+
+async function runGlobalSearch() {
+  const input = document.getElementById("global-search-input");
+  const resultsEl = document.getElementById("global-search-results");
+  if (!input || !resultsEl) return;
+
+  const q = input.value.trim();
+  if (!q) {
+    resultsEl.classList.remove("open");
+    resultsEl.innerHTML = "";
+    return;
+  }
+
+  resultsEl.classList.add("open");
+  resultsEl.innerHTML = `<div class="gsr-loading">Buscando...</div>`;
+
+  const items = await loadGlobalSearchCache();
+  const diseaseMatches = items
+    .filter(p => prescriptionMatchesQuery(p, q))
+    .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }))
+    .slice(0, 12);
+
+  const qLower = q.toLowerCase();
+  const drugMatches = (window.PEDIATRIC_DRUGS || [])
+    .filter(d => d.name.toLowerCase().includes(qLower) || (d.category || "").toLowerCase().includes(qLower))
+    .slice(0, 8);
+
+  // A busca pode ter mudado enquanto aguardávamos os dados
+  if (input.value.trim() !== q) return;
+
+  if (!diseaseMatches.length && !drugMatches.length) {
+    resultsEl.innerHTML = `<div class="gsr-empty">Nenhum resultado para "${escapeHtml(q)}".</div>`;
+    return;
+  }
+
+  let html = "";
+  if (diseaseMatches.length) {
+    html += `<div class="gsr-group-label">Prescrições</div>`;
+    html += diseaseMatches.map(p => `
+      <button class="gsr-item" onclick="openGlobalSearchResult('${p.id}', '${escapeHtml(p.sector)}')">
+        <span class="gsr-sector-badge">${escapeHtml(p.sector)}</span>
+        <span class="gsr-label">${escapeHtml(p.disease)}</span>
+        <span class="disease-arrow">→</span>
+      </button>
+    `).join("");
+  }
+  if (drugMatches.length) {
+    html += `<div class="gsr-group-label">Calculadora Pediátrica</div>`;
+    html += drugMatches.map(d => `
+      <button class="gsr-item" onclick="openGlobalSearchDrug('${d.id}')">
+        <span class="gsr-sector-badge gsr-badge-drug">Pediatria</span>
+        <span class="gsr-label">${escapeHtml(d.name)}</span>
+        <span class="disease-arrow">→</span>
+      </button>
+    `).join("");
+  }
+  resultsEl.innerHTML = html;
+}
+
+function closeGlobalSearch() {
+  const input = document.getElementById("global-search-input");
+  const resultsEl = document.getElementById("global-search-results");
+  if (input) input.value = "";
+  if (resultsEl) {
+    resultsEl.classList.remove("open");
+    resultsEl.innerHTML = "";
+  }
+}
+
+async function openGlobalSearchResult(id, sector) {
+  currentSector = sector;
+  document.body.classList.toggle("sector-red", currentSector === "Sala Vermelha");
+  const label = document.getElementById("active-sector-label");
+  if (label) label.textContent = currentSector;
+  closeGlobalSearch();
+  await openPrescription(id);
+}
+
+function openGlobalSearchDrug(drugId) {
+  closeGlobalSearch();
+  openPediatria();
+  // Pré-seleciona o medicamento assim que o select for populado
+  setTimeout(() => {
+    const sel = document.getElementById("ped-drug");
+    if (sel) {
+      sel.value = drugId;
+      onPedInput();
+    }
+  }, 0);
+}
+
+document.addEventListener("click", (ev) => {
+  const wrap = ev.target.closest(".global-search-wrap");
+  if (!wrap) {
+    const resultsEl = document.getElementById("global-search-results");
+    if (resultsEl) resultsEl.classList.remove("open");
+  }
+});
 
 // ── Visualização de Prescrições e Abas ────────────────────
 async function openPrescription(id) {
@@ -1644,5 +1768,6 @@ Object.assign(window, {
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
   openPediatria, switchPedTab, calculateDose, copyPedResult, filterPedDiseases, updatePediatricPrescriptionContext,
   renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
-  openRemune, addRemuneLinkFromInputs, deleteRemuneLink
+  openRemune, addRemuneLinkFromInputs, deleteRemuneLink,
+  handleGlobalSearch, openGlobalSearchResult, openGlobalSearchDrug, closeGlobalSearch
 });

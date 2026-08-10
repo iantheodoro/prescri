@@ -6,7 +6,7 @@
   <title>PrescriçõesMed</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20260721-1" />
+  <link rel="stylesheet" href="style.css?v=20260810-1" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -37,6 +37,10 @@
       <h1 class="welcome-title">Bem-vindo,<br/><em>Doutor.</em></h1>
       <p class="welcome-sub">Selecione o setor de atendimento</p>
 
+      <div class="global-search-wrap">
+        <input type="text" id="global-search-input" placeholder="🔎 Buscar doença ou medicamento em todos os setores..." oninput="handleGlobalSearch()" onfocus="handleGlobalSearch()" autocomplete="off" />
+        <div id="global-search-results" class="global-search-results"></div>
+      </div>
 
       <div class="sector-group-label">Pronto Atendimento</div>
       <div class="sector-grid">
@@ -664,6 +668,6 @@
   <script src="db.js?v=20260721-1"></script>
   <script src="notas.js?v=20260721-1"></script>
   <script src="pacientes.js?v=20260806-1"></script>
-  <script src="app.js?v=20260721-1"></script>
+  <script src="app.js?v=20260810-1"></script>
 </body>
 </html>

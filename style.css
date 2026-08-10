@@ -118,7 +118,105 @@ html, body {
   font-size: 14px;
   color: var(--text-muted);
   letter-spacing: 0.5px;
-  margin-bottom: 48px;
+  margin-bottom: 32px;
+}
+
+/* ── BUSCA GLOBAL (tela inicial) ──────────────────────── */
+.global-search-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto 40px;
+  text-align: left;
+}
+
+.global-search-wrap input {
+  width: 100%;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 15px;
+  padding: 13px 16px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.global-search-wrap input::placeholder { color: var(--text-dim); }
+.global-search-wrap input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 8px 32px var(--accent-glow);
+}
+
+.global-search-results {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0; right: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border-hi);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.45);
+  max-height: 360px;
+  overflow-y: auto;
+  z-index: 20;
+  padding: 6px;
+}
+
+.global-search-results.open { display: block; }
+
+.gsr-group-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding: 8px 10px 4px;
+}
+
+.gsr-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  padding: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.gsr-item:hover { background: var(--accent-dim); }
+.gsr-item:hover .disease-arrow { color: var(--accent); }
+
+.gsr-sector-badge {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+.gsr-badge-drug { color: #ffb84a; background: rgba(255,184,74,0.12); border-color: #ffb84a; }
+
+.gsr-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gsr-loading, .gsr-empty {
+  padding: 16px 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
 }
 
 .sector-grid {
