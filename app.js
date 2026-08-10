@@ -174,41 +174,21 @@ async function runGlobalSearch() {
     .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }))
     .slice(0, 12);
 
-  const qLower = q.toLowerCase();
-  const drugMatches = (window.PEDIATRIC_DRUGS || [])
-    .filter(d => d.name.toLowerCase().includes(qLower) || (d.category || "").toLowerCase().includes(qLower))
-    .slice(0, 8);
-
   // A busca pode ter mudado enquanto aguardávamos os dados
   if (input.value.trim() !== q) return;
 
-  if (!diseaseMatches.length && !drugMatches.length) {
+  if (!diseaseMatches.length) {
     resultsEl.innerHTML = `<div class="gsr-empty">Nenhum resultado para "${escapeHtml(q)}".</div>`;
     return;
   }
 
-  let html = "";
-  if (diseaseMatches.length) {
-    html += `<div class="gsr-group-label">Prescrições</div>`;
-    html += diseaseMatches.map(p => `
-      <button class="gsr-item" onclick="openGlobalSearchResult('${p.id}', '${escapeHtml(p.sector)}')">
-        <span class="gsr-sector-badge">${escapeHtml(p.sector)}</span>
-        <span class="gsr-label">${escapeHtml(p.disease)}</span>
-        <span class="disease-arrow">→</span>
-      </button>
-    `).join("");
-  }
-  if (drugMatches.length) {
-    html += `<div class="gsr-group-label">Calculadora Pediátrica</div>`;
-    html += drugMatches.map(d => `
-      <button class="gsr-item" onclick="openGlobalSearchDrug('${d.id}')">
-        <span class="gsr-sector-badge gsr-badge-drug">Pediatria</span>
-        <span class="gsr-label">${escapeHtml(d.name)}</span>
-        <span class="disease-arrow">→</span>
-      </button>
-    `).join("");
-  }
-  resultsEl.innerHTML = html;
+  resultsEl.innerHTML = diseaseMatches.map(p => `
+    <button class="gsr-item" onclick="openGlobalSearchResult('${p.id}', '${escapeHtml(p.sector)}')">
+      <span class="gsr-sector-badge">${escapeHtml(p.sector)}</span>
+      <span class="gsr-label">${escapeHtml(p.disease)}</span>
+      <span class="disease-arrow">→</span>
+    </button>
+  `).join("");
 }
 
 function closeGlobalSearch() {
@@ -228,19 +208,6 @@ async function openGlobalSearchResult(id, sector) {
   if (label) label.textContent = currentSector;
   closeGlobalSearch();
   await openPrescription(id);
-}
-
-function openGlobalSearchDrug(drugId) {
-  closeGlobalSearch();
-  openPediatria();
-  // Pré-seleciona o medicamento assim que o select for populado
-  setTimeout(() => {
-    const sel = document.getElementById("ped-drug");
-    if (sel) {
-      sel.value = drugId;
-      onPedInput();
-    }
-  }, 0);
 }
 
 document.addEventListener("click", (ev) => {
@@ -595,19 +562,9 @@ function closeImageViewer() {
 function updatePediatricPrescriptionContext() {
   const wText = document.getElementById("rx-ped-weight")?.value || "";
   const aText = document.getElementById("rx-ped-age")?.value || "";
-  
+
   pediatricPrescriptionContext.weight = wText;
   pediatricPrescriptionContext.age = aText;
-
-  const mainWeight = document.getElementById("ped-weight");
-  const mainAge = document.getElementById("ped-age");
-  if (mainWeight) mainWeight.value = wText;
-  if (mainAge) mainAge.value = aText;
-
-  // Recalcula doses se houver uma calculadora ativa (ped-ui)
-  if (window.onPedInput) {
-    window.onPedInput();
-  }
 
   renderVariantContent(currentVariantIndex);
 }
@@ -1195,168 +1152,6 @@ async function deletePrescription() {
 }
 
 // ============================================================
-//  PEDIATRIA (Integração e Redirecionamento de Cálculos)
-// ============================================================
-
-function openPediatria() {
-  showScreen("screen-pediatria");
-  if (window.initPedDrugSelect) {
-    window.initPedDrugSelect();
-  } else {
-    renderPedDrugOptions();
-  }
-  renderPedDiseaseList();
-}
-
-function switchPedTab(tabId, btn) {
-  document.querySelectorAll(".ped-tab-content").forEach(t => t.classList.remove("active"));
-  document.querySelectorAll(".ped-tab").forEach(t => t.classList.remove("active"));
-  document.getElementById(tabId).classList.add("active");
-  if (btn) btn.classList.add("active");
-}
-
-function calculateDose() {
-  if (window.onPedInput) {
-    window.onPedInput();
-    return;
-  }
-
-  const weightText = document.getElementById("ped-weight").value;
-  const ageText = document.getElementById("ped-age")?.value || "";
-  const weight = parseLocaleNumber(weightText);
-  const age = parseLocaleNumber(ageText);
-  const drugId = document.getElementById("ped-drug").value;
-  const result = document.getElementById("ped-result");
-  const placeholder = document.getElementById("ped-placeholder");
-
-  pediatricPrescriptionContext.weight = weightText;
-  pediatricPrescriptionContext.age = ageText;
-
-  const rxWeight = document.getElementById("rx-ped-weight");
-  const rxAge = document.getElementById("rx-ped-age");
-  if (rxWeight && isPediatricPrescription()) rxWeight.value = weightText;
-  if (rxAge && isPediatricPrescription()) rxAge.value = ageText;
-  if (currentPrescription && isPediatricPrescription()) renderVariantContent(currentVariantIndex);
-
-  if (!weight || !drugId || weight < 1 || weight > 150) {
-    result.style.display = "none";
-    placeholder.style.display = "flex";
-    return;
-  }
-
-  const list = (typeof pedDrugsGet === "function") ? pedDrugsGet() : (typeof PEDIATRIC_DRUGS !== "undefined" ? PEDIATRIC_DRUGS : []);
-  const drug = list.find(d => d.id === drugId);
-  if (!drug) return;
-
-  let calc = null;
-  if (typeof getPediatricCalculation === "function") {
-    calc = getPediatricCalculation(drug, weight, age);
-  }
-  if (!calc) return;
-
-  document.getElementById("ped-result-drug").textContent = drug.name;
-  document.getElementById("ped-result-route").textContent = drug.route || "VO";
-  document.getElementById("ped-dose-per-kg").textContent = drug.dose_per_kg ? `${drug.dose_per_kg} mg/kg` : "Fixa";
-  document.getElementById("ped-dose-calc").textContent = calc.label;
-  document.getElementById("ped-dose-interval").textContent = drug.interval;
-  document.getElementById("ped-notes").textContent = drug.notes || "";
-
-  const presList = document.getElementById("ped-pres-list");
-  presList.innerHTML = (drug.presentations || []).map(p => {
-    if (p.drop_mg) {
-      const gotas = Math.round(calc.dosePerDose / p.drop_mg);
-      return `<div class="ped-pres-item"><span class="ped-pres-name">${p.label}</span><span class="ped-pres-vol">${gotas} gotas</span></div>`;
-    }
-    if (p.fixed_mg) {
-      const comp = calc.dosePerDose / p.fixed_mg;
-      return `<div class="ped-pres-item"><span class="ped-pres-name">${p.label}</span><span class="ped-pres-vol">${comp.toFixed(1)} comp</span></div>`;
-    }
-    if (p.concentration) {
-      const vol = Math.round((calc.dosePerDose / p.concentration) * 10) / 10;
-      return `<div class="ped-pres-item"><span class="ped-pres-name">${p.label}</span><span class="ped-pres-vol">${vol} mL</span></div>`;
-    }
-    return "";
-  }).join("");
-
-  result.style.display = "block";
-  placeholder.style.display = "none";
-}
-
-function copyPedResult() {
-  if (window.copyPedRx) {
-    window.copyPedRx();
-    return;
-  }
-  const weight = document.getElementById("ped-weight").value;
-  const drugId = document.getElementById("ped-drug").value;
-  const list = (typeof pedDrugsGet === "function") ? pedDrugsGet() : (typeof PEDIATRIC_DRUGS !== "undefined" ? PEDIATRIC_DRUGS : []);
-  const drug = list.find(d => d.id === drugId);
-  if (!drug) return;
-
-  const doseCalc = document.getElementById("ped-dose-calc").textContent;
-  const interval = document.getElementById("ped-dose-interval").textContent;
-  const pres = [...document.querySelectorAll(".ped-pres-item")].map(el => {
-    return `  • ${el.querySelector(".ped-pres-name").textContent}: ${el.querySelector(".ped-pres-vol").textContent}`;
-  }).join("\n");
-
-  const text = `${drug.name} — Peso: ${weight} kg
-Dose: ${doseCalc}
-Intervalo: ${interval}
-Apresentações:
-${pres}`;
-  navigator.clipboard.writeText(text).then(() => {
-    const fb = document.getElementById("ped-copy-feedback");
-    if (fb) {
-      fb.classList.add("show");
-      setTimeout(() => fb.classList.remove("show"), 2000);
-    }
-  });
-}
-
-async function renderPedDiseaseList(filter = "") {
-  const list = document.getElementById("ped-disease-list");
-  if (!list) return;
-  list.innerHTML = `<div class="empty-state">Carregando...</div>`;
-  showLoading();
-  try {
-    const rawPed = await window.dbGetBySector("Pediatria");
-    const mergedPed = mergeBySameDisease(rawPed)
-      .sort((a, b) => a.disease.localeCompare(b.disease, 'pt-BR', { sensitivity: 'base' }));
-    const items = mergedPed.filter(p => prescriptionMatchesQuery(p, filter));
-    if (!items.length) {
-      list.innerHTML = filter
-        ? `<div class="empty-state">Nenhum resultado para "${escapeHtml(filter)}".</div>`
-        : `<div class="empty-state">Nenhuma prescrição pediátrica.<br/>Use ⚙ para adicionar (setor: Pediatria).</div>`;
-      return;
-    }
-    list.innerHTML = items.map(p => `
-      <button class="disease-item" onclick="openPrescription('${p.id}')">
-        <span class="disease-arrow">→</span>
-        <span class="disease-label">${p.disease}</span>
-        ${p.variants && p.variants.length > 1 ? `<span class="variant-count">${p.variants.length} variantes</span>` : ''}
-      </button>
-    `).join("");
-  } catch(e) {
-    list.innerHTML = `<div class="empty-state">Erro ao carregar diagnósticos pediátricos.</div>`;
-  } finally { hideLoading(); }
-}
-
-function filterPedDiseases() {
-  renderPedDiseaseList(document.getElementById("ped-search").value);
-}
-
-// ── Fallback caso Admin de Fármacos Pediátricos falte ──────
-function renderPedDrugOptions() {}
-function renderPedDrugAdmin() {}
-function newPedDrug() {}
-function editPedDrug() {}
-function addPedPresentationField() {}
-function removePedPresentationField() {}
-function savePedDrug() {}
-function deletePedDrug() {}
-function updatePedMarkerPreview() {}
-
-// ============================================================
 //  CALCULADORAS DE INFUSÃO (Sala Vermelha / UTI)
 // ============================================================
 
@@ -1766,8 +1561,7 @@ Object.assign(window, {
   mergeBySameDisease, prepareAddTab, searchExistingDisease, selectExistingDisease, cancelAddToExisting,
   handleVariantImageUpload, addVariantImageEntry, openImageViewer, closeImageViewer,
   openIntubacao, calculateIntubacao, openSedacao, calculateSedacao,
-  openPediatria, switchPedTab, calculateDose, copyPedResult, filterPedDiseases, updatePediatricPrescriptionContext,
-  renderPedDrugAdmin, newPedDrug, editPedDrug, addPedPresentationField, removePedPresentationField, savePedDrug, deletePedDrug, updatePedMarkerPreview,
+  updatePediatricPrescriptionContext,
   openRemune, addRemuneLinkFromInputs, deleteRemuneLink,
-  handleGlobalSearch, openGlobalSearchResult, openGlobalSearchDrug, closeGlobalSearch
+  handleGlobalSearch, openGlobalSearchResult, closeGlobalSearch
 });
