@@ -1,6 +1,8 @@
 // ============================================================
 //  anamnese.js — Modelos de anamnese prontos para copiar e colar
-//  Modelos padrão + modelos próprios (salvos em localStorage).
+//  Todos os modelos são editáveis e excluíveis (salvos em localStorage).
+//  Os modelos padrão são semeados uma única vez; o que você excluir
+//  não volta, a menos que use "Restaurar padrões".
 // ============================================================
 
 const ANAM_CUSTOM_KEY = "prescricoes_anamnese_custom";
@@ -354,7 +356,10 @@ Tipagem sanguínea / fator Rh (se conhecido): ______`
   }
 ];
 
-// ── Persistência dos modelos próprios ─────────────────────
+// ── Persistência ─────────────────────────────────────────
+const ANAM_SEEDED_KEY = "prescricoes_anamnese_seeded";
+const ANAM_NO_TAG = "Sem etiqueta";
+
 function anamCustomGet() {
   try {
     const raw = localStorage.getItem(ANAM_CUSTOM_KEY);
@@ -363,6 +368,27 @@ function anamCustomGet() {
 }
 function anamCustomSave(list) {
   try { localStorage.setItem(ANAM_CUSTOM_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function anamSeededGet() {
+  try { return JSON.parse(localStorage.getItem(ANAM_SEEDED_KEY)) || []; } catch (e) { return []; }
+}
+
+// Semeia os modelos padrão que ainda não foram semeados neste dispositivo.
+function anamSeed() {
+  const list = anamCustomGet();
+  const seeded = anamSeededGet();
+  const have = new Set(list.map(x => x.id));
+  let changed = false;
+  ANAM_DEFAULTS.forEach(d => {
+    if (seeded.includes(d.id)) return;
+    if (!have.has(d.id)) list.push({ id: d.id, title: d.title, category: d.category, text: d.text });
+    seeded.push(d.id);
+    changed = true;
+  });
+  if (changed) {
+    anamCustomSave(list);
+    try { localStorage.setItem(ANAM_SEEDED_KEY, JSON.stringify(seeded)); } catch (e) {}
+  }
 }
 
 function anamEscape(value = "") {
@@ -374,58 +400,98 @@ function anamEscape(value = "") {
     .replace(/'/g, "&#039;");
 }
 
-function anamAll() {
-  const custom = anamCustomGet().map(c => ({ ...c, custom: true, category: c.category || "Meus modelos" }));
-  return [...custom, ...ANAM_DEFAULTS.map(d => ({ ...d, custom: false }))];
+function anamNormTag(v) {
+  return (v || "").trim() || ANAM_NO_TAG;
 }
 
-// ── Navegação ────────────────────────────────────────────
+// ── Estado ───────────────────────────────────────────────
 let anamOpenId = null;
+let anamFilterTag = "";
 
 function openAnamnese() {
+  anamSeed();
   showScreen("screen-anamnese");
   const s = document.getElementById("anam-search");
   if (s) s.value = "";
+  anamFilterTag = "";
+  anamOpenId = null;
   renderAnamnese();
 }
 
 // ── Renderização ─────────────────────────────────────────
+function anamTagList(all) {
+  const counts = new Map();
+  all.forEach(t => {
+    const tag = anamNormTag(t.category);
+    counts.set(tag, (counts.get(tag) || 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0], "pt-BR"));
+}
+
 function renderAnamnese() {
   const wrap = document.getElementById("anam-list");
   if (!wrap) return;
-  const q = (document.getElementById("anam-search")?.value || "").trim().toLowerCase();
 
-  const items = anamAll().filter(t =>
-    !q || t.title.toLowerCase().includes(q) ||
-    (t.category || "").toLowerCase().includes(q) ||
-    t.text.toLowerCase().includes(q)
+  const all = anamCustomGet();
+  const tags = anamTagList(all);
+  if (anamFilterTag && !tags.some(([t]) => t === anamFilterTag)) anamFilterTag = "";
+
+  // Chips de etiqueta (filtro)
+  const chips = document.getElementById("anam-tags");
+  if (chips) {
+    chips.innerHTML = all.length ? `
+      <button type="button" class="anam-chip${anamFilterTag === "" ? " active" : ""}" data-tag="" onclick="anamSetTag(this.dataset.tag)">Todas (${all.length})</button>
+      ${tags.map(([t, n]) => `
+        <button type="button" class="anam-chip${anamFilterTag === t ? " active" : ""}" data-tag="${anamEscape(t)}" onclick="anamSetTag(this.dataset.tag)">${anamEscape(t)} (${n})</button>
+      `).join("")}` : "";
+  }
+
+  const q = (document.getElementById("anam-search")?.value || "").trim().toLowerCase();
+  const items = all.filter(t =>
+    (!anamFilterTag || anamNormTag(t.category) === anamFilterTag) &&
+    (!q || t.title.toLowerCase().includes(q) ||
+      anamNormTag(t.category).toLowerCase().includes(q) ||
+      (t.text || "").toLowerCase().includes(q))
   );
 
+  const datalist = `<datalist id="anam-tags-list">${tags.map(([t]) => `<option value="${anamEscape(t)}"></option>`).join("")}</datalist>`;
+
+  if (!all.length) {
+    wrap.innerHTML = datalist + `<div class="empty-state">Nenhum modelo salvo.<br/>Use “+ Novo modelo” ou “Restaurar padrões”.</div>`;
+    return;
+  }
   if (!items.length) {
-    wrap.innerHTML = `<div class="empty-state">Nenhum modelo encontrado.</div>`;
+    wrap.innerHTML = datalist + `<div class="empty-state">Nenhum modelo encontrado.</div>`;
     return;
   }
 
-  wrap.innerHTML = items.map(t => {
-    const open = anamOpenId === t.id || (q && items.length === 1);
+  wrap.innerHTML = datalist + items.map(t => {
+    const id = anamEscape(t.id);
+    const open = anamOpenId === t.id;
     return `
-      <div class="anam-card${open ? " open" : ""}" data-id="${anamEscape(t.id)}">
-        <button type="button" class="anam-head" onclick="anamToggle('${anamEscape(t.id)}')">
+      <div class="anam-card${open ? " open" : ""}" data-id="${id}">
+        <button type="button" class="anam-head" onclick="anamToggle('${id}')">
           <span class="anam-title">${anamEscape(t.title)}</span>
-          <span class="anam-tag">${anamEscape(t.category)}</span>
+          <span class="anam-tag">${anamEscape(anamNormTag(t.category))}</span>
           <span class="anam-chevron">▾</span>
         </button>
         ${open ? `
           <div class="anam-body">
-            <textarea class="anam-textarea" id="anam-ta-${anamEscape(t.id)}" spellcheck="false"
+            <div class="anam-edit-row">
+              <label>Título
+                <input type="text" id="anam-ti-${id}" value="${anamEscape(t.title)}" />
+              </label>
+              <label>Etiqueta
+                <input type="text" id="anam-tg-${id}" list="anam-tags-list" value="${anamEscape(t.category === ANAM_NO_TAG ? "" : (t.category || ""))}" placeholder="Ex: Cardiologia" />
+              </label>
+            </div>
+            <textarea class="anam-textarea" id="anam-ta-${id}" spellcheck="false"
               oninput="anamAutoSize(this)">${anamEscape(t.text)}</textarea>
             <div class="anam-actions">
-              <button type="button" class="anam-btn anam-btn-primary" onclick="anamCopy('${anamEscape(t.id)}', this)">📋 Copiar</button>
-              ${t.custom
-                ? `<button type="button" class="anam-btn" onclick="anamSaveEdit('${anamEscape(t.id)}')">💾 Salvar alterações</button>
-                   <button type="button" class="anam-btn anam-btn-danger" onclick="anamDelete('${anamEscape(t.id)}')">🗑 Excluir</button>`
-                : `<button type="button" class="anam-btn" onclick="anamReset('${anamEscape(t.id)}')">↺ Restaurar original</button>
-                   <button type="button" class="anam-btn" onclick="anamDuplicate('${anamEscape(t.id)}')">＋ Salvar como meu modelo</button>`}
+              <button type="button" class="anam-btn anam-btn-primary" onclick="anamCopy('${id}', this)">📋 Copiar</button>
+              <button type="button" class="anam-btn anam-btn-save" onclick="anamSaveEdit('${id}')">💾 Salvar alterações</button>
+              <button type="button" class="anam-btn" onclick="anamDuplicate('${id}')">⧉ Duplicar</button>
+              <button type="button" class="anam-btn anam-btn-danger" onclick="anamDelete('${id}')">🗑 Excluir</button>
             </div>
           </div>` : ""}
       </div>`;
@@ -442,6 +508,12 @@ function anamAutoSize(ta) {
 
 function anamToggle(id) {
   anamOpenId = anamOpenId === id ? null : id;
+  renderAnamnese();
+}
+
+function anamSetTag(tag) {
+  anamFilterTag = tag || "";
+  anamOpenId = null;
   renderAnamnese();
 }
 
@@ -465,34 +537,25 @@ async function anamCopy(id, btn) {
   }
 }
 
-function anamReset(id) {
-  const base = ANAM_DEFAULTS.find(d => d.id === id);
-  const ta = document.getElementById("anam-ta-" + id);
-  if (!base || !ta) return;
-  ta.value = base.text;
-  anamAutoSize(ta);
-}
-
-function anamDuplicate(id) {
-  const base = ANAM_DEFAULTS.find(d => d.id === id);
-  const ta = document.getElementById("anam-ta-" + id);
-  if (!base) return;
-  const list = anamCustomGet();
-  const newId = "c" + Date.now();
-  list.unshift({ id: newId, title: base.title + " (meu)", category: "Meus modelos", text: ta ? ta.value : base.text });
-  anamCustomSave(list);
-  anamOpenId = newId;
-  renderAnamnese();
-}
-
 function anamSaveEdit(id) {
   const ta = document.getElementById("anam-ta-" + id);
+  const ti = document.getElementById("anam-ti-" + id);
+  const tg = document.getElementById("anam-tg-" + id);
   const list = anamCustomGet();
   const item = list.find(x => x.id === id);
-  if (!item || !ta) return;
+  if (!item || !ta || !ti || !tg) return;
+  const title = ti.value.trim();
+  if (!title) {
+    alert("O modelo precisa de um título.");
+    ti.focus();
+    return;
+  }
+  item.title = title;
+  item.category = anamNormTag(tg.value);
   item.text = ta.value;
   anamCustomSave(list);
-  const btn = document.querySelector(`.anam-card[data-id="${id}"] .anam-btn:nth-child(2)`);
+  renderAnamnese();
+  const btn = document.querySelector(`.anam-card[data-id="${id}"] .anam-btn-save`);
   if (btn) {
     const old = btn.textContent;
     btn.textContent = "✓ Salvo!";
@@ -500,10 +563,45 @@ function anamSaveEdit(id) {
   }
 }
 
+function anamDuplicate(id) {
+  const list = anamCustomGet();
+  const base = list.find(x => x.id === id);
+  if (!base) return;
+  const ta = document.getElementById("anam-ta-" + id);
+  const newId = "c" + Date.now();
+  const idx = list.findIndex(x => x.id === id);
+  list.splice(idx + 1, 0, {
+    id: newId,
+    title: base.title + " (cópia)",
+    category: base.category,
+    text: ta ? ta.value : base.text
+  });
+  anamCustomSave(list);
+  anamOpenId = newId;
+  renderAnamnese();
+}
+
 function anamDelete(id) {
-  if (!confirm("Excluir este modelo?")) return;
+  const item = anamCustomGet().find(x => x.id === id);
+  if (!item) return;
+  if (!confirm(`Excluir o modelo "${item.title}"?`)) return;
   anamCustomSave(anamCustomGet().filter(x => x.id !== id));
   anamOpenId = null;
+  renderAnamnese();
+}
+
+function anamRestoreDefaults() {
+  const list = anamCustomGet();
+  const have = new Set(list.map(x => x.id));
+  const missing = ANAM_DEFAULTS.filter(d => !have.has(d.id));
+  if (!missing.length) {
+    alert("Todos os modelos padrão já estão na sua lista.");
+    return;
+  }
+  if (!confirm(`Restaurar ${missing.length} modelo(s) padrão que foram excluídos? Os que você já tem não serão alterados.`)) return;
+  missing.forEach(d => list.push({ id: d.id, title: d.title, category: d.category, text: d.text }));
+  anamCustomSave(list);
+  try { localStorage.setItem(ANAM_SEEDED_KEY, JSON.stringify(ANAM_DEFAULTS.map(d => d.id))); } catch (e) {}
   renderAnamnese();
 }
 
@@ -516,6 +614,7 @@ function anamToggleNewForm() {
 
 function anamCreateNew() {
   const title = document.getElementById("anam-new-title").value.trim();
+  const tag = document.getElementById("anam-new-tag").value;
   const text = document.getElementById("anam-new-text").value;
   if (!title || !text.trim()) {
     alert("Preencha o título e o texto do modelo.");
@@ -523,11 +622,13 @@ function anamCreateNew() {
   }
   const list = anamCustomGet();
   const id = "c" + Date.now();
-  list.unshift({ id, title, category: "Meus modelos", text });
+  list.unshift({ id, title, category: anamNormTag(tag), text });
   anamCustomSave(list);
   document.getElementById("anam-new-title").value = "";
+  document.getElementById("anam-new-tag").value = "";
   document.getElementById("anam-new-text").value = "";
   document.getElementById("anam-new-form").classList.remove("open");
+  anamFilterTag = "";
   anamOpenId = id;
   renderAnamnese();
 }
@@ -535,11 +636,12 @@ function anamCreateNew() {
 window.openAnamnese = openAnamnese;
 window.renderAnamnese = renderAnamnese;
 window.anamToggle = anamToggle;
+window.anamSetTag = anamSetTag;
 window.anamAutoSize = anamAutoSize;
 window.anamCopy = anamCopy;
-window.anamReset = anamReset;
-window.anamDuplicate = anamDuplicate;
 window.anamSaveEdit = anamSaveEdit;
+window.anamDuplicate = anamDuplicate;
 window.anamDelete = anamDelete;
+window.anamRestoreDefaults = anamRestoreDefaults;
 window.anamToggleNewForm = anamToggleNewForm;
 window.anamCreateNew = anamCreateNew;

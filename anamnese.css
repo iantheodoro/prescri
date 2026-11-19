@@ -58,3 +58,22 @@
 }
 .anam-textarea:focus { border-color: var(--accent, #4af0c4); }
 .anam-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Etiquetas (filtro) */
+.anam-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.anam-chip {
+  padding: 6px 12px; border-radius: 999px; font: inherit; font-size: .78rem; cursor: pointer; color: inherit;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.16); transition: .15s;
+}
+.anam-chip:hover { background: rgba(255,255,255,0.1); }
+.anam-chip.active { background: rgba(74,240,196,0.18); border-color: var(--accent, #4af0c4); color: var(--accent, #4af0c4); }
+
+/* Edição de título e etiqueta */
+.anam-edit-row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px; }
+.anam-edit-row label { display: flex; flex-direction: column; gap: 4px; font-size: .72rem; opacity: .85; }
+.anam-edit-row input {
+  padding: 9px 11px; border-radius: 9px; font: inherit; font-size: .9rem; color: inherit; outline: none;
+  background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.14);
+}
+.anam-edit-row input:focus { border-color: var(--accent, #4af0c4); }
+@media (max-width: 560px) { .anam-edit-row { grid-template-columns: 1fr; } }
