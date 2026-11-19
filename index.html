@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css?v=20260810-2" />
+  <link rel="stylesheet" href="anamnese.css?v=20261119-1" />
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
   <script>
@@ -101,6 +102,11 @@
           <div class="sector-icon">🛏️</div>
           <div class="sector-name">Gestão de Pacientes</div>
           <div class="sector-desc">Cronômetro por paciente em atendimento</div>
+        </button>
+        <button class="sector-card sector-card-special" onclick="openAnamnese()">
+          <div class="sector-icon">📋</div>
+          <div class="sector-name">Anamneses prontas</div>
+          <div class="sector-desc">Modelos para copiar e colar</div>
         </button>
       </div>
 
@@ -265,6 +271,32 @@
       </div>
 
       <div id="sed-results" class="sed-card"></div>
+    </div>
+  </div>
+
+  <!-- ANAMNESES PRONTAS SCREEN -->
+  <div id="screen-anamnese" class="screen">
+    <div class="bg-grid"></div>
+    <div class="top-bar">
+      <button class="btn-back" onclick="goBack('screen-welcome')">← Voltar</button>
+      <div class="sector-badge" style="background:rgba(74,240,196,0.12);border-color:var(--accent);color:var(--accent)">📋 Anamneses</div>
+    </div>
+    <div class="anam-content">
+      <h2 class="section-title">Anamneses <em>prontas</em></h2>
+      <p class="anam-hint">Modelos para copiar e colar no prontuário. Abra um modelo, preencha os campos ______ direto na caixa de texto se quiser e toque em Copiar. Você também pode criar e guardar seus próprios modelos neste dispositivo.</p>
+      <div class="anam-toolbar">
+        <input type="text" id="anam-search" placeholder="Buscar modelo (ex: dor torácica, trauma...)" oninput="renderAnamnese()" />
+        <button type="button" class="anam-btn" onclick="anamToggleNewForm()">+ Novo modelo</button>
+      </div>
+      <div class="anam-new-form" id="anam-new-form">
+        <input type="text" id="anam-new-title" placeholder="Título do modelo" />
+        <textarea id="anam-new-text" placeholder="Texto do modelo..."></textarea>
+        <div class="anam-actions">
+          <button type="button" class="anam-btn anam-btn-primary" onclick="anamCreateNew()">Salvar modelo</button>
+          <button type="button" class="anam-btn" onclick="anamToggleNewForm()">Cancelar</button>
+        </div>
+      </div>
+      <div class="anam-list" id="anam-list"></div>
     </div>
   </div>
 
@@ -519,6 +551,7 @@
   <script src="db.js?v=20260721-1"></script>
   <script src="notas.js?v=20260721-1"></script>
   <script src="pacientes.js?v=20260806-1"></script>
+  <script src="anamnese.js?v=20261119-1"></script>
   <script src="app.js?v=20260810-2"></script>
 </body>
 </html>
