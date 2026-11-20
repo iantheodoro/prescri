@@ -1,6 +1,8 @@
 // ============================================================
 //  anamnese.js — Modelos de anamnese prontos para copiar e colar
-//  Todos os modelos são editáveis e excluíveis (salvos em localStorage).
+//  Todos os modelos são editáveis e excluíveis. Ficam no localStorage
+//  (uso offline) e são sincronizados com o Firebase (documento
+//  "SYS_anamneses" na coleção de prescrições), mesclando por modelo.
 //  Os modelos padrão são semeados uma única vez; o que você excluir
 //  não volta, a menos que use "Restaurar padrões".
 // ============================================================
@@ -381,13 +383,167 @@ function anamSeed() {
   let changed = false;
   ANAM_DEFAULTS.forEach(d => {
     if (seeded.includes(d.id)) return;
-    if (!have.has(d.id)) list.push({ id: d.id, title: d.title, category: d.category, text: d.text });
+    if (!have.has(d.id)) list.push({ id: d.id, title: d.title, category: d.category, text: d.text, updatedAt: 0 });
     seeded.push(d.id);
     changed = true;
   });
   if (changed) {
     anamCustomSave(list);
     try { localStorage.setItem(ANAM_SEEDED_KEY, JSON.stringify(seeded)); } catch (e) {}
+  }
+}
+
+// ── Sincronização com o Firebase ─────────────────────────
+// Local-first: tudo funciona offline; ao conectar, mescla com a nuvem.
+// Cada modelo tem "updatedAt"; exclusões viram "tombstones" (id → hora),
+// e vence sempre a versão mais recente de cada modelo.
+const ANAM_TOMB_KEY = "prescricoes_anamnese_deleted";
+const ANAM_CLOUD_DOC = "SYS_anamneses";
+const ANAM_TOMB_TTL = 90 * 24 * 60 * 60 * 1000; // 90 dias
+
+let anamSyncing = false;
+let anamSyncAgain = false;
+let anamSyncTimer = null;
+let anamDirty = false;
+
+function anamTombGet() {
+  try { return JSON.parse(localStorage.getItem(ANAM_TOMB_KEY)) || {}; } catch (e) { return {}; }
+}
+function anamTombSave(t) {
+  try { localStorage.setItem(ANAM_TOMB_KEY, JSON.stringify(t)); } catch (e) {}
+}
+
+function anamCleanItem(i) {
+  return {
+    id: String((i && i.id) || ""),
+    title: String((i && i.title) || ""),
+    category: String((i && i.category) || ""),
+    text: String((i && i.text) || ""),
+    updatedAt: +(i && i.updatedAt) || 0
+  };
+}
+
+function anamLocalState() {
+  return { items: anamCustomGet(), deleted: anamTombGet(), seeded: anamSeededGet() };
+}
+function anamApplyState(st) {
+  anamCustomSave(st.items);
+  anamTombSave(st.deleted);
+  try { localStorage.setItem(ANAM_SEEDED_KEY, JSON.stringify(st.seeded)); } catch (e) {}
+}
+
+// Mescla dois estados (a = local, b = nuvem)
+function anamMerge(a, b) {
+  a = a || {}; b = b || {};
+  const now = Date.now();
+
+  const tomb = {};
+  [b.deleted, a.deleted].forEach(src => Object.entries(src || {}).forEach(([id, ts]) => {
+    ts = +ts || 0;
+    if (now - ts > ANAM_TOMB_TTL) return;
+    if (!(tomb[id] >= ts)) tomb[id] = ts;
+  }));
+
+  const byId = new Map();
+  const order = [];
+  (b.items || []).forEach(raw => {
+    const it = anamCleanItem(raw);
+    if (!it.id || byId.has(it.id)) return;
+    byId.set(it.id, it);
+    order.push(it.id);
+  });
+  const localOnly = [];
+  (a.items || []).forEach(raw => {
+    const it = anamCleanItem(raw);
+    if (!it.id) return;
+    const cur = byId.get(it.id);
+    if (!cur) { byId.set(it.id, it); localOnly.push(it.id); }
+    else if (it.updatedAt > cur.updatedAt) byId.set(it.id, it);
+  });
+
+  const items = [];
+  [...localOnly, ...order].forEach(id => {
+    const it = byId.get(id);
+    const t = tomb[id];
+    if (t !== undefined && t >= it.updatedAt) return; // excluído depois da última edição
+    items.push(it);
+  });
+  Object.keys(tomb).forEach(id => {
+    const it = byId.get(id);
+    if (it && it.updatedAt > tomb[id]) delete tomb[id]; // restaurado depois de excluído
+  });
+
+  const seeded = [...new Set([...(a.seeded || []), ...(b.seeded || [])])];
+  return { items, deleted: tomb, seeded };
+}
+
+function anamSig(st) {
+  return JSON.stringify([
+    (st.items || []).map(i => { const c = anamCleanItem(i); return [c.id, c.title, c.category, c.text, c.updatedAt]; }),
+    Object.entries(st.deleted || {}).map(([k, v]) => [k, +v || 0]).sort((x, y) => (x[0] < y[0] ? -1 : 1)),
+    [...(st.seeded || [])].sort()
+  ]);
+}
+
+function anamCloudAvailable() {
+  return typeof firebase !== "undefined" && typeof db !== "undefined" && typeof COL !== "undefined";
+}
+
+function anamSetStatus(kind, msg) {
+  const el = document.getElementById("anam-sync-status");
+  if (!el) return;
+  el.className = "anam-sync " + kind;
+  el.textContent = msg;
+}
+
+// Salva localmente e agenda a sincronização
+function anamCommit(list) {
+  anamCustomSave(list);
+  anamSyncSoon();
+}
+function anamSyncSoon() {
+  clearTimeout(anamSyncTimer);
+  anamSyncTimer = setTimeout(anamSyncNow, 500);
+}
+
+// Evita apagar o que o usuário está digitando por causa de uma sincronização em segundo plano
+function anamRefreshIfIdle() {
+  const screen = document.getElementById("screen-anamnese");
+  if (!screen || !screen.classList.contains("active")) return;
+  const ae = document.activeElement;
+  const typing = ae && ["INPUT", "TEXTAREA"].includes(ae.tagName) && screen.contains(ae);
+  if (typing || anamDirty) return;
+  renderAnamnese();
+}
+
+async function anamSyncNow() {
+  if (!anamCloudAvailable()) { anamSetStatus("off", "Nuvem indisponível — salvo só neste dispositivo"); return; }
+  if (!navigator.onLine) { anamSetStatus("off", "Offline — sincroniza ao reconectar"); return; }
+  if (anamSyncing) { anamSyncAgain = true; return; }
+
+  anamSyncing = true;
+  anamSetStatus("busy", "Sincronizando…");
+  try {
+    const ref = db.collection(COL).doc(ANAM_CLOUD_DOC);
+    const merged = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      const cloud = snap.exists ? snap.data() : {};
+      const m = anamMerge(anamLocalState(), cloud);
+      if (!snap.exists || anamSig(m) !== anamSig(cloud)) {
+        tx.set(ref, { items: m.items, deleted: m.deleted, seeded: m.seeded, updatedAt: Date.now() });
+      }
+      return m;
+    });
+    // Reaplica o que foi alterado localmente enquanto a sincronização rodava
+    anamApplyState(anamMerge(anamLocalState(), merged));
+    anamSetStatus("ok", "☁ Sincronizado");
+    anamRefreshIfIdle();
+  } catch (e) {
+    console.error("Erro ao sincronizar anamneses:", e);
+    anamSetStatus("err", "Falha ao sincronizar — toque em ↻ para tentar de novo");
+  } finally {
+    anamSyncing = false;
+    if (anamSyncAgain) { anamSyncAgain = false; anamSyncSoon(); }
   }
 }
 
@@ -416,6 +572,7 @@ function openAnamnese() {
   anamFilterTag = "";
   anamOpenId = null;
   renderAnamnese();
+  anamSyncNow();
 }
 
 // ── Renderização ─────────────────────────────────────────
@@ -431,6 +588,7 @@ function anamTagList(all) {
 function renderAnamnese() {
   const wrap = document.getElementById("anam-list");
   if (!wrap) return;
+  anamDirty = false;
 
   const all = anamCustomGet();
   const tags = anamTagList(all);
@@ -553,7 +711,8 @@ function anamSaveEdit(id) {
   item.title = title;
   item.category = anamNormTag(tg.value);
   item.text = ta.value;
-  anamCustomSave(list);
+  item.updatedAt = Date.now();
+  anamCommit(list);
   renderAnamnese();
   const btn = document.querySelector(`.anam-card[data-id="${id}"] .anam-btn-save`);
   if (btn) {
@@ -574,9 +733,10 @@ function anamDuplicate(id) {
     id: newId,
     title: base.title + " (cópia)",
     category: base.category,
-    text: ta ? ta.value : base.text
+    text: ta ? ta.value : base.text,
+    updatedAt: Date.now()
   });
-  anamCustomSave(list);
+  anamCommit(list);
   anamOpenId = newId;
   renderAnamnese();
 }
@@ -585,7 +745,10 @@ function anamDelete(id) {
   const item = anamCustomGet().find(x => x.id === id);
   if (!item) return;
   if (!confirm(`Excluir o modelo "${item.title}"?`)) return;
-  anamCustomSave(anamCustomGet().filter(x => x.id !== id));
+  const tomb = anamTombGet();
+  tomb[id] = Date.now();
+  anamTombSave(tomb);
+  anamCommit(anamCustomGet().filter(x => x.id !== id));
   anamOpenId = null;
   renderAnamnese();
 }
@@ -599,8 +762,14 @@ function anamRestoreDefaults() {
     return;
   }
   if (!confirm(`Restaurar ${missing.length} modelo(s) padrão que foram excluídos? Os que você já tem não serão alterados.`)) return;
-  missing.forEach(d => list.push({ id: d.id, title: d.title, category: d.category, text: d.text }));
-  anamCustomSave(list);
+  const now = Date.now();
+  const tomb = anamTombGet();
+  missing.forEach(d => {
+    list.push({ id: d.id, title: d.title, category: d.category, text: d.text, updatedAt: now });
+    delete tomb[d.id];
+  });
+  anamTombSave(tomb);
+  anamCommit(list);
   try { localStorage.setItem(ANAM_SEEDED_KEY, JSON.stringify(ANAM_DEFAULTS.map(d => d.id))); } catch (e) {}
   renderAnamnese();
 }
@@ -622,8 +791,8 @@ function anamCreateNew() {
   }
   const list = anamCustomGet();
   const id = "c" + Date.now();
-  list.unshift({ id, title, category: anamNormTag(tag), text });
-  anamCustomSave(list);
+  list.unshift({ id, title, category: anamNormTag(tag), text, updatedAt: Date.now() });
+  anamCommit(list);
   document.getElementById("anam-new-title").value = "";
   document.getElementById("anam-new-tag").value = "";
   document.getElementById("anam-new-text").value = "";
@@ -645,3 +814,18 @@ window.anamDelete = anamDelete;
 window.anamRestoreDefaults = anamRestoreDefaults;
 window.anamToggleNewForm = anamToggleNewForm;
 window.anamCreateNew = anamCreateNew;
+window.anamSyncNow = anamSyncNow;
+
+// Marca edição em andamento e reage a mudanças de conexão/visibilidade
+document.addEventListener("input", e => {
+  if (e.target && e.target.closest && e.target.closest("#anam-list")) anamDirty = true;
+});
+window.addEventListener("online", () => {
+  const screen = document.getElementById("screen-anamnese");
+  if (screen && screen.classList.contains("active")) anamSyncNow();
+});
+window.addEventListener("offline", () => anamSetStatus("off", "Offline — sincroniza ao reconectar"));
+document.addEventListener("visibilitychange", () => {
+  const screen = document.getElementById("screen-anamnese");
+  if (!document.hidden && screen && screen.classList.contains("active")) anamSyncNow();
+});
